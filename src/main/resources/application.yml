@@ -1,0 +1,45 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: polenta-mcp-server
+
+# PrestoDB Configuration
+presto:
+  url: jdbc:presto://localhost:8080/hive/default
+  user: ${PRESTO_USER:admin}
+  password: ${PRESTO_PASSWORD:}
+  catalog: ${PRESTO_CATALOG:hive}
+  schema: ${PRESTO_SCHEMA:default}
+  connection-timeout: 30000
+  query-timeout: 300000
+
+# MCP Server Configuration
+mcp:
+  server:
+    name: "Polenta Data Lake Server"
+    version: "1.0.0"
+    description: "MCP Server for accessing PrestoDB data lake with user-friendly queries"
+  
+# Logging Configuration
+logging:
+  level:
+    com.santec.polenta: DEBUG
+    io.prestodb: INFO
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
