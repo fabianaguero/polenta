@@ -44,13 +44,6 @@
             <version>2.6.0</version>
         </dependency>
 
-        <!-- PrestoDB JDBC Driver -->
-        <dependency>
-            <groupId>io.prestodb</groupId>
-            <artifactId>presto-jdbc</artifactId>
-            <version>${presto.version}</version>
-        </dependency>
-
         <!-- JSON Processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -75,6 +68,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.prestosql</groupId>
+            <artifactId>presto-jdbc</artifactId>
+            <version>350</version>
         </dependency>
     </dependencies>
 

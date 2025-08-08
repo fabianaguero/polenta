@@ -9,13 +9,13 @@ spring:
 
 # PrestoDB Configuration
 presto:
-  url: ${PRESTO_URL:jdbc:presto://localhost:8080/hive/default}
+  url: ${PRESTO_URL:jdbc:presto://localhost:8081/hive/default}
   user: ${PRESTO_USER:admin}
   password: ${PRESTO_PASSWORD:}
   catalog: ${PRESTO_CATALOG:hive}
   schema: ${PRESTO_SCHEMA:default}
   connection-timeout: 30000
-  query-timeout: 300000
+
 
 # MCP Server Configuration
 mcp:

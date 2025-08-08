@@ -1,19 +1,8 @@
-version: '3.8'
 services:
   presto:
-    image: prestodb/presto:0.284
+    image: ghcr.io/timescale/prestodb-sandbox:0.289
+    container_name: prestodb-sandbox
     ports:
-      - "8082:8080"
+      - "8081:8081"
     volumes:
-      - ./docker/presto/etc/catalog:/opt/presto-server/etc/catalog
-  polenta:
-    build: .
-    depends_on:
-      - presto
-    ports:
-      - "8080:8080"
-    environment:
-      PRESTO_URL: jdbc:presto://presto:8080/tpch/tiny
-      PRESTO_CATALOG: tpch
-      PRESTO_SCHEMA: tiny
-      PRESTO_USER: admin
+      - ./presto/catalog:/etc/catalog
