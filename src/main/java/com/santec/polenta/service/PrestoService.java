@@ -109,9 +109,21 @@ public class PrestoService {
         if (prestoConfig.getQueryTimeout() > 0) {
             properties.setProperty("socketTimeout", String.valueOf(prestoConfig.getQueryTimeout()));
         }
-        Connection conn = DriverManager.getConnection(prestoConfig.getUrl(), properties);
-        logger.debug("Conexión establecida correctamente");
-        return conn;
+        int previousLoginTimeout = DriverManager.getLoginTimeout();
+        if (prestoConfig.getConnectionTimeout() > 0) {
+            properties.setProperty("connectionTimeout", String.valueOf(prestoConfig.getConnectionTimeout()));
+            int timeoutSeconds = (int) Math.ceil(prestoConfig.getConnectionTimeout() / 1000.0);
+            DriverManager.setLoginTimeout(timeoutSeconds);
+        }
+        try {
+            Connection conn = DriverManager.getConnection(prestoConfig.getUrl(), properties);
+            logger.debug("Conexión establecida correctamente");
+            return conn;
+        } finally {
+            if (prestoConfig.getConnectionTimeout() > 0) {
+                DriverManager.setLoginTimeout(previousLoginTimeout);
+            }
+        }
     }
 
     public boolean testConnection() {
