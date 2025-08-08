@@ -50,6 +50,10 @@ public class QueryIntelligenceService {
                     return handleSampleData(query);
                 case "SEARCH_TABLES":
                     return handleSearchTables(query);
+                case "DIRECT_SQL":
+                    return handleDirectSQL(query);
+                case "UNKNOWN":
+                    return createErrorResponse("Could not determine query type. Please refine your request.");
                 default:
                     return handleDirectSQL(query);
             }
