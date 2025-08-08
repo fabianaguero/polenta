@@ -3,6 +3,8 @@ package com.santec.polenta.controller;
 import com.santec.polenta.model.mcp.*;
 import com.santec.polenta.service.QueryIntelligenceService;
 import com.santec.polenta.service.PrestoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/mcp")
 @CrossOrigin(origins = "*")
+@Tag(name = "MCP", description = "Endpoints for interacting with the MCP server")
 public class McpController {
     
     private static final Logger logger = LoggerFactory.getLogger(McpController.class);
@@ -41,6 +44,7 @@ public class McpController {
      * MCP Initialize endpoint - establishes connection with client
      */
     @PostMapping("/initialize")
+    @Operation(summary = "Initialize connection with the MCP server")
     public ResponseEntity<McpResponse<Map<String, Object>>> initialize(@RequestBody McpRequest request) {
         logger.info("MCP Initialize request received");
         
@@ -56,6 +60,7 @@ public class McpController {
      * MCP Tools List endpoint - returns available tools
      */
     @PostMapping("/tools/list")
+    @Operation(summary = "List available MCP tools")
     public ResponseEntity<McpResponse<Map<String, Object>>> listTools(@RequestBody McpRequest request) {
         logger.info("MCP Tools list request received");
         
@@ -90,6 +95,7 @@ public class McpController {
      * MCP Tools Call endpoint - executes tool calls
      */
     @PostMapping("/tools/call")
+    @Operation(summary = "Execute an MCP tool")
     public ResponseEntity<McpResponse<Map<String, Object>>> callTool(@RequestBody McpRequest request) {
         logger.info("MCP Tool call request received");
         
@@ -113,6 +119,7 @@ public class McpController {
      * Health check endpoint
      */
     @GetMapping("/health")
+    @Operation(summary = "Service health status")
     public ResponseEntity<Map<String, Object>> health() {
         Map<String, Object> health = new HashMap<>();
         health.put("status", "UP");
