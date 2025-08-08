@@ -39,12 +39,26 @@ presto:
 ```
 
 3. **Compilar y ejecutar**
+ ```bash
+ mvn clean install
+ mvn spring-boot:run
+ ```
+
+ El servidor estará disponible en `http://localhost:8080`
+
+### Ejecutar con Docker
+
+Para probar rápidamente el servidor con un PrestoDB de ejemplo se puede
+utilizar el `docker-compose.yml` incluido. Este levanta un contenedor de
+Presto con el conector `tpch` que genera datos sintéticos y el servidor
+Polenta conectado a él.
+
 ```bash
-mvn clean install
-mvn spring-boot:run
+docker-compose up --build
 ```
 
-El servidor estará disponible en `http://localhost:8080`
+El servidor MCP quedará disponible en `http://localhost:8080` y el Presto
+de prueba en `http://localhost:8082`.
 
 ## Endpoints MCP
 
