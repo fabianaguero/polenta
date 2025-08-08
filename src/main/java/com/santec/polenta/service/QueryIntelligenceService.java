@@ -26,6 +26,8 @@ public class QueryIntelligenceService {
         Pattern.compile("(?i).*show.*tables.*"), "SHOW_TABLES",
         Pattern.compile("(?i).*list.*tables.*"), "SHOW_TABLES",
         Pattern.compile("(?i).*what.*tables.*"), "SHOW_TABLES",
+        Pattern.compile("(?i).*accessible.*tables.*"), "ACCESSIBLE_TABLES",
+        Pattern.compile("(?i).*tables.*can.*access.*"), "ACCESSIBLE_TABLES",
         Pattern.compile("(?i).*describe.*table.*"), "DESCRIBE_TABLE",
         Pattern.compile("(?i).*columns.*in.*"), "DESCRIBE_TABLE",
         Pattern.compile("(?i).*structure.*of.*"), "DESCRIBE_TABLE",
@@ -46,6 +48,8 @@ public class QueryIntelligenceService {
             switch (queryType) {
                 case "SHOW_TABLES":
                     return handleShowTables(query);
+                case "ACCESSIBLE_TABLES":
+                    return handleAccessibleTables(query);
                 case "DESCRIBE_TABLE":
                     return handleDescribeTable(query);
                 case "SAMPLE_DATA":
@@ -110,6 +114,21 @@ public class QueryIntelligenceService {
         response.put("schemas", schemaTablesMap);
         response.put("message", "Available tables organized by schema");
         
+        return response;
+    }
+
+    /**
+     * Handle requests to list only tables with access permissions
+     */
+    private Map<String, Object> handleAccessibleTables(String query) throws SQLException {
+        Map<String, Object> response = new HashMap<>();
+
+        List<String> accessible = prestoService.getAccessibleTables();
+
+        response.put("type", "accessible_table_list");
+        response.put("tables", accessible);
+        response.put("message", "Tables accessible for querying");
+
         return response;
     }
     

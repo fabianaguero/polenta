@@ -65,16 +65,19 @@ public class McpController {
         logger.info("MCP Tools list request received");
         
         List<McpTool> tools = Arrays.asList(
-            createTool("query_data", 
+            createTool("query_data",
                 "Execute natural language or SQL queries against the data lake",
                 createQuerySchema()),
-            createTool("list_tables", 
+            createTool("list_tables",
                 "List all available tables in the data lake",
                 createListTablesSchema()),
-            createTool("describe_table", 
+            createTool("accessible_tables",
+                "List tables the user has permission to query",
+                createAccessibleTablesSchema()),
+            createTool("describe_table",
                 "Get detailed information about a specific table structure",
                 createDescribeTableSchema()),
-            createTool("sample_data", 
+            createTool("sample_data",
                 "Get sample data from a specific table",
                 createSampleDataSchema()),
             createTool("search_tables", 
@@ -142,7 +145,10 @@ public class McpController {
                 
             case "list_tables":
                 return queryIntelligenceService.processNaturalQuery("show all tables");
-                
+
+            case "accessible_tables":
+                return queryIntelligenceService.processNaturalQuery("show accessible tables");
+
             case "describe_table":
                 String tableName = (String) arguments.get("table_name");
                 return queryIntelligenceService.processNaturalQuery("describe table " + tableName);
@@ -212,6 +218,13 @@ public class McpController {
     }
     
     private Map<String, Object> createListTablesSchema() {
+        Map<String, Object> schema = new HashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", Map.of());
+        return schema;
+    }
+
+    private Map<String, Object> createAccessibleTablesSchema() {
         Map<String, Object> schema = new HashMap<>();
         schema.put("type", "object");
         schema.put("properties", Map.of());
