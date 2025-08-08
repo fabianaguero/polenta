@@ -80,21 +80,13 @@ public class PrestoService {
 
     public List<String> searchTables(String keyword) throws SQLException {
         logger.debug("Buscando tablas que contengan la palabra clave: {}", keyword);
-        List<String> matchingTables = new ArrayList<>();
-        List<String> schemas = getSchemas();
-
-        for (String schema : schemas) {
-            try {
-                List<String> tables = getTables(schema);
-                for (String table : tables) {
-                    if (table.toLowerCase().contains(keyword.toLowerCase())) {
-                        matchingTables.add(schema + "." + table);
-                    }
-                }
-            } catch (SQLException e) {
-                logger.warn("No se pudo acceder al esquema {}: {}", schema, e.getMessage());
-            }
-        }
+        String sql = String.format(
+                "SELECT table_schema, table_name FROM information_schema.tables WHERE LOWER(table_name) LIKE '%%%s%%'",
+                keyword.toLowerCase());
+        List<Map<String, Object>> results = executeQuery(sql);
+        List<String> matchingTables = results.stream()
+                .map(row -> (String) row.get("table_schema") + "." + (String) row.get("table_name"))
+                .toList();
         logger.debug("Tablas encontradas con la palabra clave '{}': {}", keyword, matchingTables);
         return matchingTables;
     }
@@ -150,20 +142,17 @@ public class PrestoService {
     public List<String> getAccessibleTables() throws SQLException {
         logger.debug("Obteniendo tablas accesibles para el usuario...");
         List<String> accessibleTables = new ArrayList<>();
-        List<String> schemas = getSchemas();
+        String sql = "SELECT table_schema, table_name FROM information_schema.tables";
+        List<Map<String, Object>> results = executeQuery(sql);
 
-        for (String schema : schemas) {
-            try {
-                List<String> tables = getTables(schema);
-                for (String table : tables) {
-                    if (canAccessTable(schema, table)) {
-                        accessibleTables.add(schema + "." + table);
-                    }
-                }
-            } catch (SQLException e) {
-                logger.warn("No se pudo acceder al esquema {}: {}", schema, e.getMessage());
+        for (Map<String, Object> row : results) {
+            String schema = (String) row.get("table_schema");
+            String table = (String) row.get("table_name");
+            if (canAccessTable(schema, table)) {
+                accessibleTables.add(schema + "." + table);
             }
         }
+
         logger.debug("Tablas accesibles: {}", accessibleTables);
         return accessibleTables;
     }
