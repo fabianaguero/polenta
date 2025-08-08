@@ -143,4 +143,41 @@ public class PrestoService {
             return false;
         }
     }
+
+    /**
+     * Determine if the current user can query a specific table
+     */
+    public boolean canAccessTable(String schema, String table) {
+        try {
+            String sql = String.format("SELECT 1 FROM %s.%s LIMIT 1", schema, table);
+            executeQuery(sql);
+            return true;
+        } catch (SQLException e) {
+            logger.debug("No access to table {}.{}: {}", schema, table, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get list of tables that the user has permission to query
+     */
+    public List<String> getAccessibleTables() throws SQLException {
+        List<String> accessibleTables = new ArrayList<>();
+        List<String> schemas = getSchemas();
+
+        for (String schema : schemas) {
+            try {
+                List<String> tables = getTables(schema);
+                for (String table : tables) {
+                    if (canAccessTable(schema, table)) {
+                        accessibleTables.add(schema + "." + table);
+                    }
+                }
+            } catch (SQLException e) {
+                logger.warn("Could not access schema {}: {}", schema, e.getMessage());
+            }
+        }
+
+        return accessibleTables;
+    }
 }
