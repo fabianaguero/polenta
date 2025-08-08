@@ -14,7 +14,6 @@ presto:
   password: ${PRESTO_PASSWORD:}
   catalog: ${PRESTO_CATALOG:hive}
   schema: ${PRESTO_SCHEMA:default}
-  connection-timeout: 30000
   query-timeout: 300000
 
 # MCP Server Configuration

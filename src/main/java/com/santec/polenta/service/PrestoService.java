@@ -121,10 +121,6 @@ public class PrestoService {
             properties.setProperty("password", prestoConfig.getPassword());
         }
 
-        if (prestoConfig.getConnectionTimeout() > 0) {
-            properties.setProperty("connectionTimeout", String.valueOf(prestoConfig.getConnectionTimeout()));
-        }
-
         if (prestoConfig.getQueryTimeout() > 0) {
             properties.setProperty("socketTimeout", String.valueOf(prestoConfig.getQueryTimeout()));
         }
