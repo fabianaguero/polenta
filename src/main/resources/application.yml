@@ -9,7 +9,7 @@ spring:
 
 # PrestoDB Configuration
 presto:
-  url: ${PRESTO_URL:jdbc:presto://localhost:8081/hive/default}
+  url: ${PRESTO_URL:jdbc:presto://localhost:8082/hive/default}
   user: ${PRESTO_USER:admin}
   password: ${PRESTO_PASSWORD:}
   catalog: ${PRESTO_CATALOG:hive}

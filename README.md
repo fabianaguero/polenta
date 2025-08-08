@@ -31,7 +31,7 @@ cd polenta
 Editar `src/main/resources/application.yml`:
 ```yaml
 presto:
-  url: jdbc:presto://tu-servidor-presto:8080/hive/default
+  url: jdbc:presto://tu-servidor-presto:8082/hive/default
   user: tu-usuario
   password: tu-password
   catalog: hive
