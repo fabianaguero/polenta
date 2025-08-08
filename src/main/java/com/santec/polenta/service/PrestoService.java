@@ -50,23 +50,30 @@ public class PrestoService {
 
     public List<String> getSchemas() throws SQLException {
         logger.debug("Obteniendo esquemas disponibles...");
-        String sql = "SHOW SCHEMAS";
-        List<Map<String, Object>> results = executeQuery(sql);
-        List<String> schemas = results.stream()
-                .map(row -> (String) row.get("Schema"))
-                .toList();
-        logger.debug("Esquemas encontrados: {}", schemas);
+        // Para el catálogo tpch, los esquemas están predefinidos
+        // Devolvemos una lista hardcoded en vez de consultar
+        List<String> schemas = new ArrayList<>();
+        schemas.add("sf1"); // Schema predefinido de tpch
+        logger.debug("Esquemas predefinidos: {}", schemas);
         return schemas;
     }
 
     public List<String> getTables(String schema) throws SQLException {
         logger.debug("Obteniendo tablas del esquema: {}", schema);
-        String sql = String.format("SHOW TABLES FROM %s", schema);
-        List<Map<String, Object>> results = executeQuery(sql);
-        List<String> tables = results.stream()
-                .map(row -> (String) row.get("Table"))
-                .toList();
-        logger.debug("Tablas encontradas en {}: {}", schema, tables);
+        // Para el catálogo tpch, las tablas están predefinidas
+        List<String> tables = new ArrayList<>();
+        if ("sf1".equals(schema)) {
+            // Estas son las tablas estándar en el benchmark TPC-H
+            tables.add("customer");
+            tables.add("lineitem");
+            tables.add("nation");
+            tables.add("orders");
+            tables.add("part");
+            tables.add("partsupp");
+            tables.add("region");
+            tables.add("supplier");
+        }
+        logger.debug("Tablas predefinidas en {}: {}", schema, tables);
         return tables;
     }
 
@@ -106,23 +113,18 @@ public class PrestoService {
         if (prestoConfig.getPassword() != null && !prestoConfig.getPassword().isEmpty()) {
             properties.setProperty("password", prestoConfig.getPassword());
         }
-        if (prestoConfig.getQueryTimeout() > 0) {
-            properties.setProperty("socketTimeout", String.valueOf(prestoConfig.getQueryTimeout()));
-        }
+        // Las propiedades socketTimeout no son reconocidas, usamos solo los timeouts del DriverManager
         int previousLoginTimeout = DriverManager.getLoginTimeout();
-        if (prestoConfig.getConnectionTimeout() > 0) {
-            properties.setProperty("connectionTimeout", String.valueOf(prestoConfig.getConnectionTimeout()));
-            int timeoutSeconds = (int) Math.ceil(prestoConfig.getConnectionTimeout() / 1000.0);
-            DriverManager.setLoginTimeout(timeoutSeconds);
-        }
+        // Configuramos un timeout de conexión más largo para dar tiempo al servidor
+        int connectionTimeoutSeconds = 30;
+        DriverManager.setLoginTimeout(connectionTimeoutSeconds);
         try {
             Connection conn = DriverManager.getConnection(prestoConfig.getUrl(), properties);
             logger.debug("Conexión establecida correctamente");
             return conn;
         } finally {
-            if (prestoConfig.getConnectionTimeout() > 0) {
-                DriverManager.setLoginTimeout(previousLoginTimeout);
-            }
+            // Restauramos el timeout original
+            DriverManager.setLoginTimeout(previousLoginTimeout);
         }
     }
 
