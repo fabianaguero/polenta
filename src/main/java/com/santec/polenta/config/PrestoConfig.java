@@ -20,7 +20,7 @@ public class PrestoConfig {
     private String catalog;
     /** Default schema used for queries */
     private String schema;
-    /** Connection timeout in milliseconds */
+    /** Connection timeout in milliseconds applied to the JDBC login process */
     private long connectionTimeout;
     /** Query timeout in milliseconds */
     private long queryTimeout;

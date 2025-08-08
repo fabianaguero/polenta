@@ -36,6 +36,8 @@ presto:
   password: tu-password
   catalog: hive
   schema: default
+  connection-timeout: 5000 # Tiempo de espera para establecer la conexión (ms)
+  query-timeout: 10000     # Tiempo máximo para ejecutar consultas (ms)
 ```
 
 3. **Compilar y ejecutar**
