@@ -23,6 +23,8 @@ mcp:
     name: "Polenta Data Lake Server"
     version: "1.0.0"
     description: "MCP Server for accessing PrestoDB data lake with user-friendly queries"
+  helpers:
+    enabled: true  # Set to false in production to disable REST wrapper endpoints
   
 # Logging Configuration
 logging:
