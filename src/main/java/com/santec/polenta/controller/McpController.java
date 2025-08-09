@@ -1,455 +1,177 @@
 package com.santec.polenta.controller;
 
-import com.santec.polenta.model.mcp.*;
-import com.santec.polenta.service.QueryIntelligenceService;
-import com.santec.polenta.service.PrestoService;
+import com.santec.polenta.service.McpDispatcherService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
 import ch.qos.logback.classic.Level;
 
-/**
- * MCP-compliant REST controller for data lake access
- */
 @RestController
 @RequestMapping("/mcp")
 @CrossOrigin(origins = "*")
+@ConditionalOnProperty(name = "mcp.helpers.enabled", havingValue = "true", matchIfMissing = true)
+@Tag(name = "MCP Helpers", description = "Non-standard helper endpoints - use POST /mcp for standard MCP compliance")
 public class McpController {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(McpController.class);
-    
+
     @Autowired
-    private QueryIntelligenceService queryIntelligenceService;
-    
-    @Autowired
-    private PrestoService prestoService;
-    
-    @Value("${mcp.server.name}")
-    private String serverName;
-    
-    @Value("${mcp.server.version}")
-    private String serverVersion;
-    
-    @Value("${mcp.server.description}")
-    private String serverDescription;
-    
-    /**
-     * MCP Initialize endpoint - establishes connection with client
-     */
+    private McpDispatcherService dispatcherService;
+
     @PostMapping("/initialize")
-    public ResponseEntity<McpResponse<Map<String, Object>>> initialize(@RequestBody McpRequest request) {
-        logger.info("MCP Initialize request received");
+    @Operation(
+            summary = "[HELPER] Inicializa la conexión con el servidor MCP",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
+            requestBody = @RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Ejemplo de request",
+                                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"1\", \"method\": \"initialize\", \"params\": {} }"
+                            )
+                    )
+            )
+    )
+    public ResponseEntity<Map<String, Object>> initialize(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        logger.info("Helper endpoint /mcp/initialize called with parameters: {}", request);
         
-        Map<String, Object> result = new HashMap<>();
-        result.put("protocolVersion", "2024-11-05");
-        result.put("capabilities", getServerCapabilities());
-        result.put("serverInfo", getServerInfo());
-        
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Ping endpoint - liveness check
-     */
-    @PostMapping("/ping")
-    public ResponseEntity<McpResponse<Map<String, Object>>> ping(@RequestBody McpRequest request) {
-        logger.info("MCP Ping request received");
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "ok");
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * Notification for cancelled operations
-     */
-    @PostMapping("/notifications/cancelled")
-    public ResponseEntity<Void> cancelled(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Cancelled notification received: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Notification for progress updates
-     */
-    @PostMapping("/notifications/progress")
-    public ResponseEntity<Void> progress(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Progress notification received: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * MCP Tools List endpoint - returns available tools
-     */
-    @PostMapping("/tools/list")
-    public ResponseEntity<McpResponse<Map<String, Object>>> listTools(@RequestBody McpRequest request) {
-        logger.info("MCP Tools list request received");
-        
-        List<McpTool> tools = Arrays.asList(
-            createTool("query_data", 
-                "Execute natural language or SQL queries against the data lake",
-                createQuerySchema()),
-            createTool("list_tables", 
-                "List all available tables in the data lake",
-                createListTablesSchema()),
-            createTool("describe_table", 
-                "Get detailed information about a specific table structure",
-                createDescribeTableSchema()),
-            createTool("sample_data", 
-                "Get sample data from a specific table",
-                createSampleDataSchema()),
-            createTool("search_tables", 
-                "Search for tables containing specific keywords",
-                createSearchTablesSchema()),
-            createTool("get_suggestions", 
-                "Get helpful query suggestions for users",
-                createSuggestionsSchema())
-        );
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("tools", tools);
-        
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-    
-    /**
-     * MCP Tools Call endpoint - executes tool calls
-     */
-    @PostMapping("/tools/call")
-    public ResponseEntity<McpResponse<Map<String, Object>>> callTool(@RequestBody McpRequest request) {
-        logger.info("MCP Tool call request received");
+        // Extract fields for internal JSON-RPC call
+        String id = (String) request.get("id");
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        String sessionId = generateSessionId(httpRequest);
         
         try {
-            Map<String, Object> params = request.getParams();
-            String toolName = (String) params.get("name");
-            Map<String, Object> arguments = (Map<String, Object>) params.get("arguments");
-            
-            Map<String, Object> result = executeToolCall(toolName, arguments);
-            
-            return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-            
+            Map<String, Object> result = dispatcherService.dispatch("initialize", params, sessionId);
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
         } catch (Exception e) {
-            logger.error("Error executing tool call: {}", e.getMessage());
-            McpError error = McpError.internalError("Tool execution failed: " + e.getMessage());
-            return ResponseEntity.ok(McpResponse.error(request.getId(), error));
+            logger.error("Error in helper initialize endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
         }
     }
 
-    /**
-     * MCP Prompts List endpoint - returns available prompts
-     */
-    @PostMapping("/prompts/list")
-    public ResponseEntity<McpResponse<Map<String, Object>>> listPrompts(@RequestBody McpRequest request) {
-        logger.info("MCP Prompts list request received");
+ 
 
-        List<Map<String, Object>> prompts = Arrays.asList(
-            Map.of("name", "greeting", "description", "Sample greeting prompt")
-        );
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("prompts", prompts);
-        result.put("nextCursor", null);
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Prompts Get endpoint - returns prompt details
-     */
-    @PostMapping("/prompts/get")
-    public ResponseEntity<McpResponse<Map<String, Object>>> getPrompt(@RequestBody McpRequest request) {
-        logger.info("MCP Prompts get request received");
-        String name = (String) request.getParams().get("name");
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("name", name);
-        result.put("description", "Sample prompt " + name);
-        result.put("messages", List.of(
-            Map.of("role", "system", "content", "This is a sample prompt: " + name)
-        ));
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * Notification for prompts list changes
-     */
-    @PostMapping("/notifications/prompts/list_changed")
-    public ResponseEntity<Void> promptsListChanged(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Prompts list changed notification: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * MCP Resources List endpoint
-     */
-    @PostMapping("/resources/list")
-    public ResponseEntity<McpResponse<Map<String, Object>>> listResources(@RequestBody McpRequest request) {
-        logger.info("MCP Resources list request received");
-
-        List<Map<String, Object>> resources = Arrays.asList(
-            Map.of("uri", "polenta://sample", "name", "sample", "description", "Sample resource")
-        );
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("resources", resources);
-        result.put("nextCursor", null);
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Resources Read endpoint
-     */
-    @PostMapping("/resources/read")
-    public ResponseEntity<McpResponse<Map<String, Object>>> readResource(@RequestBody McpRequest request) {
-        logger.info("MCP Resources read request received");
-        String uri = (String) request.getParams().get("uri");
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("uri", uri);
-        result.put("mimeType", "text/plain");
-        result.put("text", "Sample content for " + uri);
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Resources Templates List endpoint
-     */
-    @PostMapping("/resources/templates/list")
-    public ResponseEntity<McpResponse<Map<String, Object>>> listResourceTemplates(@RequestBody McpRequest request) {
-        logger.info("MCP Resources templates list request received");
-        Map<String, Object> result = new HashMap<>();
-        result.put("templates", Collections.emptyList());
-        result.put("nextCursor", null);
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Resources Subscribe endpoint
-     */
-    @PostMapping("/resources/subscribe")
-    public ResponseEntity<McpResponse<Map<String, Object>>> subscribeResources(@RequestBody McpRequest request) {
-        logger.info("MCP Resources subscribe request received: {}", request.getParams());
-        Map<String, Object> result = new HashMap<>();
-        result.put("ok", true);
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * Notification for resource updates
-     */
-    @PostMapping("/notifications/resources/updated")
-    public ResponseEntity<Void> resourcesUpdated(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Resources updated notification: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Notification for resource list changes
-     */
-    @PostMapping("/notifications/resources/list_changed")
-    public ResponseEntity<Void> resourcesListChanged(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Resources list changed notification: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Notification for tools list changes
-     */
-    @PostMapping("/notifications/tools/list_changed")
-    public ResponseEntity<Void> toolsListChanged(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Tools list changed notification: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * MCP Logging setLevel endpoint
-     */
-    @PostMapping("/logging/setLevel")
-    public ResponseEntity<McpResponse<Map<String, Object>>> setLevel(@RequestBody McpRequest request) {
-        logger.info("MCP Logging setLevel request received");
-        String level = (String) request.getParams().get("level");
-        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)
-                LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-        if (level != null) {
-            root.setLevel(Level.toLevel(level, Level.INFO));
-        }
-        Map<String, Object> result = new HashMap<>();
-        result.put("level", root.getLevel().toString());
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * Notification for structured messages
-     */
-    @PostMapping("/notifications/message")
-    public ResponseEntity<Void> notificationMessage(@RequestBody Map<String, Object> notification) {
-        logger.info("MCP Message notification: {}", notification);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * MCP Completion endpoint - returns completion items
-     */
-    @PostMapping("/completion/complete")
-    public ResponseEntity<McpResponse<Map<String, Object>>> completion(@RequestBody McpRequest request) {
-        logger.info("MCP Completion request received");
-        Map<String, Object> result = new HashMap<>();
-        result.put("items", Collections.emptyList());
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-    
-    /**
-     * Health check endpoint
-     */
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, Object>> health() {
-        Map<String, Object> health = new HashMap<>();
-        health.put("status", "UP");
-        health.put("server", serverName);
-        health.put("version", serverVersion);
-        health.put("database_connection", prestoService.testConnection());
-        health.put("timestamp", System.currentTimeMillis());
+    @PostMapping("/tools/list")
+    @Operation(
+            summary = "[HELPER] Lista las herramientas disponibles",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
+            requestBody = @RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Ejemplo de request",
+                                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"2\", \"method\": \"tools/list\", \"params\": {} }"
+                            )
+                    )
+            )
+    )
+    public ResponseEntity<Map<String, Object>> listTools(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        logger.info("Helper endpoint /mcp/tools/list called with parameters: {}", request);
         
-        return ResponseEntity.ok(health);
-    }
-    
-    /**
-     * Execute specific tool calls
-     */
-    private Map<String, Object> executeToolCall(String toolName, Map<String, Object> arguments) {
-        switch (toolName) {
-            case "query_data":
-                String query = (String) arguments.get("query");
-                return queryIntelligenceService.processNaturalQuery(query);
-                
-            case "list_tables":
-                return queryIntelligenceService.processNaturalQuery("show all tables");
-                
-            case "describe_table":
-                String tableName = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("describe table " + tableName);
-                
-            case "sample_data":
-                String sampleTable = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("show sample data from " + sampleTable);
-                
-            case "search_tables":
-                String keyword = (String) arguments.get("keyword");
-                return queryIntelligenceService.processNaturalQuery("search for " + keyword);
-                
-            case "get_suggestions":
-                Map<String, Object> suggestions = new HashMap<>();
-                suggestions.put("type", "suggestions");
-                suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
-                suggestions.put("message", "Helpful query suggestions");
-                return suggestions;
-                
-            default:
-                throw new IllegalArgumentException("Unknown tool: " + toolName);
+        String id = (String) request.get("id");
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        
+        try {
+            Map<String, Object> result = dispatcherService.dispatch("tools/list", params, null);
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        } catch (Exception e) {
+            logger.error("Error in helper tools/list endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
         }
     }
-    
-    /**
-     * Get server capabilities
-     */
-    private Map<String, Object> getServerCapabilities() {
-        Map<String, Object> capabilities = new HashMap<>();
-        capabilities.put("tools", Map.of("listChanged", false));
-        capabilities.put("resources", Map.of("subscribe", false, "listChanged", false));
-        capabilities.put("prompts", Map.of("listChanged", false));
-        capabilities.put("logging", Map.of("setLevel", true));
-        capabilities.put("completion", Map.of("complete", true));
-        return capabilities;
-    }
-    
-    /**
-     * Get server information
-     */
-    private Map<String, Object> getServerInfo() {
-        Map<String, Object> serverInfo = new HashMap<>();
-        serverInfo.put("name", serverName);
-        serverInfo.put("version", serverVersion);
-        serverInfo.put("description", serverDescription);
-        return serverInfo;
-    }
-    
-    /**
-     * Create MCP tool definition
-     */
-    private McpTool createTool(String name, String description, Map<String, Object> inputSchema) {
-        return new McpTool(name, description, inputSchema);
-    }
-    
-    /**
-     * Schema definitions for different tools
-     */
-    private Map<String, Object> createQuerySchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-            "query", Map.of(
-                "type", "string",
-                "description", "Natural language query or SQL statement to execute"
+
+    @PostMapping("/tools/call")
+    @Operation(
+            summary = "[HELPER] Ejecuta una herramienta específica",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
+            requestBody = @RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Ejemplo de request",
+                                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"method\": \"tools/call\", \"params\": { \"name\": \"query_data\", \"arguments\": { \"query\": \"SELECT * FROM tabla\" } } }"
+                            )
+                    )
             )
-        ));
-        schema.put("required", Arrays.asList("query"));
-        return schema;
+    )
+    public ResponseEntity<Map<String, Object>> callTool(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        logger.info("Helper endpoint /mcp/tools/call called with parameters: {}", request);
+        
+        String id = (String) request.get("id");
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        
+        try {
+            Map<String, Object> result = dispatcherService.dispatch("tools/call", params, null);
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid parameters in helper tools/call: {}", e.getMessage());
+            return ResponseEntity.ok(jsonRpcError(id, -32602, e.getMessage(), null));
+        } catch (Exception e) {
+            logger.error("Error in helper tools/call endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
+        }
     }
-    
-    private Map<String, Object> createListTablesSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of());
-        return schema;
+
+
+    // --- Utility methods for helper endpoints ---
+
+    private String generateSessionId(HttpServletRequest request) {
+        // Simple session ID generation based on client characteristics
+        String clientIp = getClientIpAddress(request);
+        String userAgent = request.getHeader("User-Agent");
+        return String.valueOf((clientIp + userAgent).hashCode());
+
+
     }
-    
-    private Map<String, Object> createDescribeTableSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-            "table_name", Map.of(
-                "type", "string",
-                "description", "Name of the table to describe (format: schema.table or just table)"
-            )
-        ));
-        schema.put("required", Arrays.asList("table_name"));
-        return schema;
+
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
     }
-    
-    private Map<String, Object> createSampleDataSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-            "table_name", Map.of(
-                "type", "string",
-                "description", "Name of the table to get sample data from"
-            )
-        ));
-        schema.put("required", Arrays.asList("table_name"));
-        return schema;
+
+    private Map<String, Object> jsonRpcSuccess(String id, Object result) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+        return response;
+
     }
-    
-    private Map<String, Object> createSearchTablesSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-            "keyword", Map.of(
-                "type", "string",
-                "description", "Keyword to search for in table names"
-            )
-        ));
-        schema.put("required", Arrays.asList("keyword"));
-        return schema;
-    }
-    
-    private Map<String, Object> createSuggestionsSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of());
-        return schema;
+
+    private Map<String, Object> jsonRpcError(String id, int code, String message, Object data) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", code);
+        error.put("message", message);
+        if (data != null) error.put("data", data);
+        response.put("error", error);
+        return response;
     }
 }
