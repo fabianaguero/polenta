@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 @Service
 public class QueryIntelligenceService {
@@ -17,7 +18,6 @@ public class QueryIntelligenceService {
     @Autowired
     private PrestoService prestoService;
 
-    // Inicialización del mapa de patrones sin límite de pares
     private static final Map<Pattern, String> QUERY_PATTERNS;
     static {
         Map<Pattern, String> patterns = new HashMap<>();
@@ -32,6 +32,7 @@ public class QueryIntelligenceService {
         patterns.put(Pattern.compile("(?i).*sample.*data.*from.*"), "SAMPLE_DATA");
         patterns.put(Pattern.compile("(?i).*show.*data.*from.*"), "SAMPLE_DATA");
         patterns.put(Pattern.compile("(?i).*preview.*"), "SAMPLE_DATA");
+        patterns.put(Pattern.compile("(?i).*lista de [a-zA-Záéíóúñ]+.*"), "LIST_ENTITY");
         QUERY_PATTERNS = Collections.unmodifiableMap(patterns);
     }
 
@@ -50,16 +51,18 @@ public class QueryIntelligenceService {
                     return handleSampleData(query);
                 case "SEARCH_TABLES":
                     return handleSearchTables(query);
+                case "LIST_ENTITY":
+                    return handleListEntity(query);
                 case "DIRECT_SQL":
                     return handleDirectSQL(query);
                 case "UNKNOWN":
-                    return createErrorResponse("Could not determine query type. Please refine your request.");
+                    return createErrorResponse("No se pudo determinar el tipo de consulta. Por favor, refine su solicitud.");
                 default:
                     return handleDirectSQL(query);
             }
         } catch (Exception e) {
             logger.error("Error processing query: {}", e.getMessage());
-            return createErrorResponse("Error processing query: " + e.getMessage());
+            return createErrorResponse("Error procesando la consulta: " + e.getMessage());
         }
     }
 
@@ -91,12 +94,12 @@ public class QueryIntelligenceService {
                     schemaTablesMap.put(schema, tables);
                 }
             } catch (SQLException e) {
-                logger.warn("Could not access schema {}: {}", schema, e.getMessage());
+                logger.warn("No se pudo acceder al esquema {}: {}", schema, e.getMessage());
             }
         }
         response.put("type", "table_list");
         response.put("schemas", schemaTablesMap);
-        response.put("message", "Available tables organized by schema");
+        response.put("message", "Tablas disponibles organizadas por esquema");
         return response;
     }
 
@@ -105,14 +108,14 @@ public class QueryIntelligenceService {
         List<String> accessible = prestoService.getAccessibleTables();
         response.put("type", "accessible_table_list");
         response.put("tables", accessible);
-        response.put("message", "Tables accessible for querying");
+        response.put("message", "Tablas accesibles para consulta");
         return response;
     }
 
     private Map<String, Object> handleDescribeTable(String query) throws SQLException {
         String tableName = extractTableName(query);
         if (tableName == null) {
-            return createErrorResponse("Could not identify table name in query. Please specify a table name.");
+            return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
         String schema = parts.length > 1 ? parts[0] : "default";
@@ -123,14 +126,14 @@ public class QueryIntelligenceService {
         response.put("schema", schema);
         response.put("table", table);
         response.put("columns", columns);
-        response.put("message", String.format("Structure of table %s.%s", schema, table));
+        response.put("message", String.format("Estructura de la tabla %s.%s", schema, table));
         return response;
     }
 
     private Map<String, Object> handleSampleData(String query) throws SQLException {
         String tableName = extractTableName(query);
         if (tableName == null) {
-            return createErrorResponse("Could not identify table name in query. Please specify a table name.");
+            return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
         String schema = parts.length > 1 ? parts[0] : "default";
@@ -141,21 +144,21 @@ public class QueryIntelligenceService {
         response.put("schema", schema);
         response.put("table", table);
         response.put("data", sampleData);
-        response.put("message", String.format("Sample data from %s.%s (limited to 10 rows)", schema, table));
+        response.put("message", String.format("Datos de ejemplo de %s.%s (limitado a 10 filas)", schema, table));
         return response;
     }
 
     private Map<String, Object> handleSearchTables(String query) throws SQLException {
         String keyword = extractSearchKeyword(query);
         if (keyword == null) {
-            return createErrorResponse("Could not identify search keyword in query.");
+            return createErrorResponse("No se pudo identificar la palabra clave de búsqueda en la consulta.");
         }
         List<String> matchingTables = prestoService.searchTables(keyword);
         Map<String, Object> response = new HashMap<>();
         response.put("type", "table_search");
         response.put("keyword", keyword);
         response.put("matching_tables", matchingTables);
-        response.put("message", String.format("Tables matching keyword '%s'", keyword));
+        response.put("message", String.format("Tablas que coinciden con la palabra clave '%s'", keyword));
         return response;
     }
 
@@ -166,8 +169,56 @@ public class QueryIntelligenceService {
         response.put("sql", query);
         response.put("data", results);
         response.put("row_count", results.size());
-        response.put("message", String.format("Query executed successfully, returned %d rows", results.size()));
+        response.put("message", String.format("Consulta ejecutada correctamente, %d filas devueltas", results.size()));
         return response;
+    }
+
+    // --- NUEVO MÉTODO PARA CONSULTAS DE ENTIDAD GENÉRICA ---
+    private Map<String, Object> handleListEntity(String query) throws SQLException {
+        String entity = extractEntityFromQuery(query);
+        if (entity == null) {
+            return createErrorResponse("No se pudo identificar la entidad en la consulta.");
+        }
+        List<String> schemas = prestoService.getSchemas();
+        List<String> matchingTables = new ArrayList<>();
+        for (String schema : schemas) {
+            List<String> tables = prestoService.getTables(schema);
+            for (String table : tables) {
+                if (table.toLowerCase().contains(entity)) {
+                    matchingTables.add(schema + "." + table);
+                }
+            }
+        }
+        if (matchingTables.isEmpty()) {
+            return createErrorResponse("No se encontró una tabla para la entidad: " + entity);
+        }
+        if (matchingTables.size() > 1) {
+            return createErrorResponse("Se encontraron varias tablas para la entidad: " + entity + ". Especifique la tabla.");
+        }
+        String table = matchingTables.get(0);
+        List<Map<String, Object>> results = prestoService.executeQuery("SELECT * FROM " + table);
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "entity_list");
+        response.put("entity", entity);
+        response.put("table", table);
+        response.put("data", results);
+        response.put("row_count", results.size());
+        response.put("message", String.format("Lista de %s, %d encontrados", entity, results.size()));
+        return response;
+    }
+
+    // Extrae la entidad de la consulta tipo "lista de X"
+    private String extractEntityFromQuery(String query) {
+        Pattern p = Pattern.compile("lista de ([a-zA-Záéíóúñ]+)", Pattern.CASE_INSENSITIVE);
+        Matcher m = p.matcher(query);
+        if (m.find()) {
+            String entity = m.group(1).toLowerCase();
+            // Normaliza plurales simples
+            if (entity.endsWith("es")) entity = entity.substring(0, entity.length() - 2);
+            else if (entity.endsWith("s")) entity = entity.substring(0, entity.length() - 1);
+            return entity;
+        }
+        return null;
     }
 
     private String extractTableName(String query) {
@@ -208,7 +259,9 @@ public class QueryIntelligenceService {
                 "Describe table table_name",
                 "Show sample data from table_name",
                 "Find tables containing keyword",
-                "SELECT * FROM schema.table LIMIT 10"
+                "SELECT * FROM schema.table LIMIT 10",
+                "Lista de países",
+                "Lista de vendedores"
         );
     }
 }
