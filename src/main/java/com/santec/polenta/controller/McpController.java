@@ -1,13 +1,13 @@
 package com.santec.polenta.controller;
 
-import com.santec.polenta.model.mcp.*;
 import com.santec.polenta.service.QueryIntelligenceService;
 import com.santec.polenta.service.PrestoService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +17,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
-/**
- * MCP-compliant REST controller for data lake access
- */
 @RestController
 @RequestMapping("/mcp")
 @CrossOrigin(origins = "*")
-@Tag(name = "MCP", description = "Endpoints for interacting with the MCP server")
+@Tag(name = "MCP", description = "Endpoints para interactuar con el servidor MCP")
 public class McpController {
 
     private static final Logger logger = LoggerFactory.getLogger(McpController.class);
@@ -43,162 +40,188 @@ public class McpController {
     @Value("${mcp.server.description}")
     private String serverDescription;
 
-    /**
-     * MCP Initialize endpoint - establishes connection with client
-     */
     @PostMapping("/initialize")
-    @Operation(summary = "Initialize connection with the MCP server")
-    public ResponseEntity<McpResponse<Map<String, Object>>> initialize(@RequestBody McpRequest request) {
-        logger.info("MCP Initialize request received");
-
+    @Operation(
+        summary = "Inicializa la conexión con el servidor MCP",
+        requestBody = @RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Ejemplo de request",
+                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"1\", \"method\": \"initialize\", \"params\": {} }"
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Respuesta exitosa",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Ejemplo de respuesta",
+                        value = "{ \"jsonrpc\": \"2.0\", \"id\": \"1\", \"result\": { \"protocolVersion\": \"2024-11-05\", \"capabilities\": { \"tools\": { \"listChanged\": false }, \"resources\": { \"subscribe\": false, \"listChanged\": false } }, \"serverInfo\": { \"name\": \"Polenta MCP\", \"version\": \"1.0.0\", \"description\": \"Servidor MCP de ejemplo\" } } }"
+                    )
+                )
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> initialize(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        String id = (String) request.get("id");
         Map<String, Object> result = new HashMap<>();
         result.put("protocolVersion", "2024-11-05");
         result.put("capabilities", getServerCapabilities());
         result.put("serverInfo", getServerInfo());
-
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+        return ResponseEntity.ok(jsonRpcSuccess(id, result));
     }
 
-    /**
-     * MCP Tools List endpoint - returns available tools
-     */
     @PostMapping("/tools/list")
-    @Operation(summary = "List available MCP tools")
-    public ResponseEntity<McpResponse<Map<String, Object>>> listTools(@RequestBody McpRequest request) {
-        logger.info("MCP Tools list request received");
-
-        List<McpTool> tools = Arrays.asList(
-            createTool("query_data",
-                "Execute natural language or SQL queries against the data lake",
-                createQuerySchema()),
-            createTool("list_tables",
-                "List all available tables in the data lake",
-                createListTablesSchema()),
-            createTool("accessible_tables",
-                "List tables the user has permission to query",
-                createAccessibleTablesSchema()),
-            createTool("describe_table",
-                "Get detailed information about a specific table structure",
-                createDescribeTableSchema()),
-            createTool("sample_data",
-                "Get sample data from a specific table",
-                createSampleDataSchema()),
-            createTool("search_tables",
-                "Search for tables containing specific keywords",
-                createSearchTablesSchema()),
-            createTool("get_suggestions",
-                "Get helpful query suggestions for users",
-                createSuggestionsSchema())
-        );
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("tools", tools);
-
-        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-    }
-
-    /**
-     * MCP Tools Call endpoint - executes tool calls
-     */
-    @PostMapping("/tools/call")
     @Operation(
-        summary = "Execute an MCP tool",
+        summary = "Lista las herramientas disponibles",
         requestBody = @RequestBody(
-            description = "Ejemplo para listar tablas",
             required = true,
             content = @Content(
+                mediaType = "application/json",
                 examples = @ExampleObject(
-                    name = "Listar tablas",
-                    summary = "Listar todas las tablas",
-                    value = "{\n" +
-                            "  \"id\": \"test-list-tables\",\n" +
-                            "  \"params\": {\n" +
-                            "    \"name\": \"list_tables\",\n" +
-                            "    \"arguments\": {}\n" +
-                            "  }\n" +
-                            "}"
+                    name = "Ejemplo de request",
+                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"2\", \"method\": \"tools/list\", \"params\": {} }"
                 )
             )
-        )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Respuesta exitosa",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Ejemplo de respuesta",
+                        value = "{ \"jsonrpc\": \"2.0\", \"id\": \"2\", \"result\": { \"tools\": [ { \"name\": \"query_data\", \"description\": \"Execute natural language or SQL queries against the data lake\", \"input_schema\": { \"type\": \"object\", \"properties\": { \"query\": { \"type\": \"string\", \"description\": \"Natural language query or SQL statement to execute\" } }, \"required\": [\"query\"] } } ] } }"
+                    )
+                )
+            )
+        }
     )
-    public ResponseEntity<McpResponse<Map<String, Object>>> callTool(
-            @org.springframework.web.bind.annotation.RequestBody McpRequest request) {
-        logger.info("MCP Tool call request received");
+    public ResponseEntity<Map<String, Object>> listTools(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        String id = (String) request.get("id");
+        List<Map<String, Object>> tools = Arrays.asList(
+            createTool("query_data", "Execute natural language or SQL queries against the data lake", createQuerySchema()),
+            createTool("list_tables", "List all available tables in the data lake", createListTablesSchema()),
+            createTool("accessible_tables", "List tables the user has permission to query", createAccessibleTablesSchema()),
+            createTool("describe_table", "Get detailed information about a specific table structure", createDescribeTableSchema()),
+            createTool("sample_data", "Get sample data from a specific table", createSampleDataSchema()),
+            createTool("search_tables", "Search for tables containing specific keywords", createSearchTablesSchema()),
+            createTool("get_suggestions", "Get helpful query suggestions for users", createSuggestionsSchema())
+        );
+        Map<String, Object> result = new HashMap<>();
+        result.put("tools", tools);
+        return ResponseEntity.ok(jsonRpcSuccess(id, result));
+    }
 
+    @PostMapping("/tools/call")
+    @Operation(
+        summary = "Ejecuta una herramienta específica",
+        requestBody = @RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Ejemplo de request",
+                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"method\": \"tools/call\", \"params\": { \"name\": \"query_data\", \"arguments\": { \"query\": \"SELECT * FROM tabla\" } } }"
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Respuesta exitosa o error JSON-RPC",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                        @ExampleObject(
+                            name = "Ejemplo de respuesta exitosa",
+                            value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"result\": { \"data\": [ ... ] } }"
+                        ),
+                        @ExampleObject(
+                            name = "Ejemplo de error",
+                            value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"error\": { \"code\": -32000, \"message\": \"Tool execution failed: Unknown tool\" } }"
+                        )
+                    }
+                )
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> callTool(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        String id = (String) request.get("id");
         try {
-            Map<String, Object> params = request.getParams();
+            Map<String, Object> params = (Map<String, Object>) request.get("params");
             String toolName = (String) params.get("name");
             Map<String, Object> arguments = (Map<String, Object>) params.get("arguments");
-
             Map<String, Object> result = executeToolCall(toolName, arguments);
-
-            return ResponseEntity.ok(McpResponse.success(request.getId(), result));
-
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
         } catch (Exception e) {
-            logger.error("Error executing tool call: {}", e.getMessage());
-            McpError error = McpError.internalError("Tool execution failed: " + e.getMessage());
-            return ResponseEntity.ok(McpResponse.error(request.getId(), error));
+            logger.error("Error ejecutando tool: {}", e.getMessage());
+            return ResponseEntity.ok(jsonRpcError(id, -32000, "Tool execution failed: " + e.getMessage(), null));
         }
     }
 
-    /**
-     * Health check endpoint
-     */
-    @GetMapping("/health")
-    @Operation(summary = "Service health status")
-    public ResponseEntity<Map<String, Object>> health() {
-        Map<String, Object> health = new HashMap<>();
-        health.put("status", "UP");
-        health.put("server", serverName);
-        health.put("version", serverVersion);
-        health.put("database_connection", prestoService.testConnection());
-        health.put("timestamp", System.currentTimeMillis());
+    // --- Utilidades JSON-RPC ---
 
-        return ResponseEntity.ok(health);
+    private Map<String, Object> jsonRpcSuccess(String id, Object result) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+        return response;
     }
 
-    /**
-     * Execute specific tool calls
-     */
+    private Map<String, Object> jsonRpcError(String id, int code, String message, Object data) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", code);
+        error.put("message", message);
+        if (data != null) error.put("data", data);
+        response.put("error", error);
+        return response;
+    }
+
+    // --- Lógica de herramientas y schemas ---
+
     private Map<String, Object> executeToolCall(String toolName, Map<String, Object> arguments) {
         switch (toolName) {
             case "query_data":
                 String query = (String) arguments.get("query");
                 return queryIntelligenceService.processNaturalQuery(query);
-
             case "list_tables":
                 return queryIntelligenceService.processNaturalQuery("show all tables");
-
             case "accessible_tables":
                 return queryIntelligenceService.processNaturalQuery("show accessible tables");
-
             case "describe_table":
                 String tableName = (String) arguments.get("table_name");
                 return queryIntelligenceService.processNaturalQuery("describe table " + tableName);
-
             case "sample_data":
                 String sampleTable = (String) arguments.get("table_name");
                 return queryIntelligenceService.processNaturalQuery("show sample data from " + sampleTable);
-
             case "search_tables":
                 String keyword = (String) arguments.get("keyword");
                 return queryIntelligenceService.processNaturalQuery("search for " + keyword);
-
             case "get_suggestions":
                 Map<String, Object> suggestions = new HashMap<>();
                 suggestions.put("type", "suggestions");
                 suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
                 suggestions.put("message", "Helpful query suggestions");
                 return suggestions;
-
             default:
                 throw new IllegalArgumentException("Unknown tool: " + toolName);
         }
     }
 
-    /**
-     * Get server capabilities
-     */
     private Map<String, Object> getServerCapabilities() {
         Map<String, Object> capabilities = new HashMap<>();
         capabilities.put("tools", Map.of("listChanged", false));
@@ -206,9 +229,6 @@ public class McpController {
         return capabilities;
     }
 
-    /**
-     * Get server information
-     */
     private Map<String, Object> getServerInfo() {
         Map<String, Object> serverInfo = new HashMap<>();
         serverInfo.put("name", serverName);
@@ -217,16 +237,14 @@ public class McpController {
         return serverInfo;
     }
 
-    /**
-     * Create MCP tool definition
-     */
-    private McpTool createTool(String name, String description, Map<String, Object> inputSchema) {
-        return new McpTool(name, description, inputSchema);
+    private Map<String, Object> createTool(String name, String description, Map<String, Object> inputSchema) {
+        Map<String, Object> tool = new HashMap<>();
+        tool.put("name", name);
+        tool.put("description", description);
+        tool.put("input_schema", inputSchema);
+        return tool;
     }
 
-    /**
-     * Schema definitions for different tools
-     */
     private Map<String, Object> createQuerySchema() {
         Map<String, Object> schema = new HashMap<>();
         schema.put("type", "object");
