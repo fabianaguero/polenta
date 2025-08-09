@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import ch.qos.logback.classic.Level;
 
 /**
  * MCP-compliant REST controller for data lake access
@@ -51,7 +52,37 @@ public class McpController {
         
         return ResponseEntity.ok(McpResponse.success(request.getId(), result));
     }
-    
+
+    /**
+     * MCP Ping endpoint - liveness check
+     */
+    @PostMapping("/ping")
+    public ResponseEntity<McpResponse<Map<String, Object>>> ping(@RequestBody McpRequest request) {
+        logger.info("MCP Ping request received");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "ok");
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * Notification for cancelled operations
+     */
+    @PostMapping("/notifications/cancelled")
+    public ResponseEntity<Void> cancelled(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Cancelled notification received: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Notification for progress updates
+     */
+    @PostMapping("/notifications/progress")
+    public ResponseEntity<Void> progress(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Progress notification received: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
     /**
      * MCP Tools List endpoint - returns available tools
      */
@@ -107,6 +138,168 @@ public class McpController {
             McpError error = McpError.internalError("Tool execution failed: " + e.getMessage());
             return ResponseEntity.ok(McpResponse.error(request.getId(), error));
         }
+    }
+
+    /**
+     * MCP Prompts List endpoint - returns available prompts
+     */
+    @PostMapping("/prompts/list")
+    public ResponseEntity<McpResponse<Map<String, Object>>> listPrompts(@RequestBody McpRequest request) {
+        logger.info("MCP Prompts list request received");
+
+        List<Map<String, Object>> prompts = Arrays.asList(
+            Map.of("name", "greeting", "description", "Sample greeting prompt")
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("prompts", prompts);
+        result.put("nextCursor", null);
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * MCP Prompts Get endpoint - returns prompt details
+     */
+    @PostMapping("/prompts/get")
+    public ResponseEntity<McpResponse<Map<String, Object>>> getPrompt(@RequestBody McpRequest request) {
+        logger.info("MCP Prompts get request received");
+        String name = (String) request.getParams().get("name");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("name", name);
+        result.put("description", "Sample prompt " + name);
+        result.put("messages", List.of(
+            Map.of("role", "system", "content", "This is a sample prompt: " + name)
+        ));
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * Notification for prompts list changes
+     */
+    @PostMapping("/notifications/prompts/list_changed")
+    public ResponseEntity<Void> promptsListChanged(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Prompts list changed notification: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * MCP Resources List endpoint
+     */
+    @PostMapping("/resources/list")
+    public ResponseEntity<McpResponse<Map<String, Object>>> listResources(@RequestBody McpRequest request) {
+        logger.info("MCP Resources list request received");
+
+        List<Map<String, Object>> resources = Arrays.asList(
+            Map.of("uri", "polenta://sample", "name", "sample", "description", "Sample resource")
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("resources", resources);
+        result.put("nextCursor", null);
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * MCP Resources Read endpoint
+     */
+    @PostMapping("/resources/read")
+    public ResponseEntity<McpResponse<Map<String, Object>>> readResource(@RequestBody McpRequest request) {
+        logger.info("MCP Resources read request received");
+        String uri = (String) request.getParams().get("uri");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("uri", uri);
+        result.put("mimeType", "text/plain");
+        result.put("text", "Sample content for " + uri);
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * MCP Resources Templates List endpoint
+     */
+    @PostMapping("/resources/templates/list")
+    public ResponseEntity<McpResponse<Map<String, Object>>> listResourceTemplates(@RequestBody McpRequest request) {
+        logger.info("MCP Resources templates list request received");
+        Map<String, Object> result = new HashMap<>();
+        result.put("templates", Collections.emptyList());
+        result.put("nextCursor", null);
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * MCP Resources Subscribe endpoint
+     */
+    @PostMapping("/resources/subscribe")
+    public ResponseEntity<McpResponse<Map<String, Object>>> subscribeResources(@RequestBody McpRequest request) {
+        logger.info("MCP Resources subscribe request received: {}", request.getParams());
+        Map<String, Object> result = new HashMap<>();
+        result.put("ok", true);
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * Notification for resource updates
+     */
+    @PostMapping("/notifications/resources/updated")
+    public ResponseEntity<Void> resourcesUpdated(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Resources updated notification: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Notification for resource list changes
+     */
+    @PostMapping("/notifications/resources/list_changed")
+    public ResponseEntity<Void> resourcesListChanged(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Resources list changed notification: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Notification for tools list changes
+     */
+    @PostMapping("/notifications/tools/list_changed")
+    public ResponseEntity<Void> toolsListChanged(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Tools list changed notification: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * MCP Logging setLevel endpoint
+     */
+    @PostMapping("/logging/setLevel")
+    public ResponseEntity<McpResponse<Map<String, Object>>> setLevel(@RequestBody McpRequest request) {
+        logger.info("MCP Logging setLevel request received");
+        String level = (String) request.getParams().get("level");
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger)
+                LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        if (level != null) {
+            root.setLevel(Level.toLevel(level, Level.INFO));
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("level", root.getLevel().toString());
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
+    }
+
+    /**
+     * Notification for structured messages
+     */
+    @PostMapping("/notifications/message")
+    public ResponseEntity<Void> notificationMessage(@RequestBody Map<String, Object> notification) {
+        logger.info("MCP Message notification: {}", notification);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * MCP Completion endpoint - returns completion items
+     */
+    @PostMapping("/completion/complete")
+    public ResponseEntity<McpResponse<Map<String, Object>>> completion(@RequestBody McpRequest request) {
+        logger.info("MCP Completion request received");
+        Map<String, Object> result = new HashMap<>();
+        result.put("items", Collections.emptyList());
+        return ResponseEntity.ok(McpResponse.success(request.getId(), result));
     }
     
     /**
@@ -167,6 +360,9 @@ public class McpController {
         Map<String, Object> capabilities = new HashMap<>();
         capabilities.put("tools", Map.of("listChanged", false));
         capabilities.put("resources", Map.of("subscribe", false, "listChanged", false));
+        capabilities.put("prompts", Map.of("listChanged", false));
+        capabilities.put("logging", Map.of("setLevel", true));
+        capabilities.put("completion", Map.of("complete", true));
         return capabilities;
     }
     

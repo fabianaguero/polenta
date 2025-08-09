@@ -64,10 +64,27 @@ de prueba en `http://localhost:8082`.
 
 ### Inicialización
 - **POST** `/mcp/initialize` - Establece conexión con cliente MCP
+- **POST** `/mcp/ping` - Verificación de actividad
+- **POST** `/mcp/notifications/cancelled` - Notifica cancelación de operaciones
+- **POST** `/mcp/notifications/progress` - Reporta progreso de operaciones
+
+### Prompts
+- **POST** `/mcp/prompts/list` - Lista prompts disponibles
+- **POST** `/mcp/prompts/get` - Obtiene detalles de un prompt específico
+
+### Recursos
+- **POST** `/mcp/resources/list` - Lista recursos disponibles
+- **POST** `/mcp/resources/read` - Lee contenido de un recurso
+- **POST** `/mcp/resources/templates/list` - Lista plantillas de recursos
+- **POST** `/mcp/resources/subscribe` - Suscribe a actualizaciones de recursos
 
 ### Herramientas Disponibles
 - **POST** `/mcp/tools/list` - Lista todas las herramientas disponibles
 - **POST** `/mcp/tools/call` - Ejecuta herramientas específicas
+
+### Utilidades
+- **POST** `/mcp/logging/setLevel` - Ajusta nivel de logs del servidor
+- **POST** `/mcp/completion/complete` - Devuelve sugerencias de autocompletado
 
 ### Salud del Sistema
 - **GET** `/mcp/health` - Estado del servidor y conexión a base de datos
