@@ -4,11 +4,12 @@ Un servidor MCP (Model Context Protocol) completo desarrollado en Java con Sprin
 
 ## Características Principales
 
-- **MCP Compliant**: Totalmente compatible con el protocolo MCP 2024-11-05
+- **MCP Compliant**: Totalmente compatible con el protocolo MCP 2024-11-05 con endpoint JSON-RPC estándar
 - **Consultas en Lenguaje Natural**: Los usuarios pueden hacer preguntas sin conocer SQL
 - **Acceso a PrestoDB**: Integración nativa con PrestoDB para consultas de datalake
 - **Abstracción de Esquemas**: Los usuarios no necesitan conocer estructuras de tablas
 - **Compatible con Múltiples Clientes**: VSCode, Ollama Desktop, y cualquier cliente MCP
+- **Endpoints Helper**: Endpoints REST adicionales para desarrollo y depuración
 
 ## Inicio Rápido
 
@@ -38,6 +39,11 @@ presto:
   schema: default
   connection-timeout: 5000 # Tiempo de espera para establecer la conexión (ms)
   query-timeout: 10000     # Tiempo máximo para ejecutar consultas (ms)
+
+# Configuración MCP
+mcp:
+  helpers:
+    enabled: true  # Habilitar endpoints helper (desactivar en producción)
 ```
 
 3. **Compilar y ejecutar**
@@ -46,7 +52,77 @@ presto:
  mvn spring-boot:run
  ```
 
- El servidor estará disponible en `http://localhost:8080`
+ El servidor estará disponible en `http://localhost:8090`
+
+## Uso del Protocolo MCP (Recomendado)
+
+### Endpoint JSON-RPC Principal
+
+**POST** `/mcp` - Endpoint estándar MCP JSON-RPC 2.0
+
+Este es el endpoint recomendado que cumple completamente con la especificación MCP.
+
+#### Ejemplos con curl:
+
+**1. Inicializar sesión:**
+```bash
+curl -X POST http://localhost:8090/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "initialize",
+    "params": {}
+  }'
+```
+
+**2. Ping (requiere inicialización previa):**
+```bash
+curl -X POST http://localhost:8090/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "2", 
+    "method": "ping",
+    "params": {}
+  }'
+```
+
+**3. Listar herramientas disponibles:**
+```bash
+curl -X POST http://localhost:8090/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "3",
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**4. Ejecutar consulta:**
+```bash
+curl -X POST http://localhost:8090/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "4",
+    "method": "tools/call",
+    "params": {
+      "name": "query_data",
+      "arguments": {
+        "query": "Muestra todas las tablas disponibles"
+      }
+    }
+  }'
+```
+
+### Prueba Rápida
+
+Ejecuta el script de prueba incluido:
+```bash
+./mcp_smoke.sh
+```
 
 ### Ejecutar con Docker
 
@@ -59,10 +135,12 @@ Polenta conectado a él.
 docker-compose up --build
 ```
 
-El servidor MCP quedará disponible en `http://localhost:8080` y el Presto
+El servidor MCP quedará disponible en `http://localhost:8090` y el Presto
 de prueba en `http://localhost:8082`.
 
-## Endpoints MCP
+## Endpoints Helper (Desarrollo)
+
+Estos endpoints están disponibles cuando `mcp.helpers.enabled=true` y proporcionan wrappers REST para facilitar el desarrollo. En producción se recomienda usar únicamente el endpoint `/mcp`.
 
 ### Inicialización
 - **POST** `/mcp/initialize` - Establece conexión con cliente MCP
@@ -119,14 +197,24 @@ Proporciona sugerencias útiles de consultas para usuarios.
 
 ### VSCode
 1. Instalar extensión MCP
-2. Configurar servidor: `http://localhost:8080/mcp`
+2. Configurar servidor: `http://localhost:8090/mcp`
 
 ### Ollama Desktop
 1. Agregar servidor MCP en configuración
-2. URL: `http://localhost:8080/mcp`
+2. URL: `http://localhost:8090/mcp`
 
 ### Cliente Personalizado
-Usar cualquier cliente compatible con MCP 2024-11-05 apuntando a los endpoints `/mcp/*`.
+Usar cualquier cliente compatible con MCP 2024-11-05 apuntando al endpoint `/mcp` con JSON-RPC 2.0.
+
+## Códigos de Error JSON-RPC
+
+El servidor implementa los códigos de error estándar JSON-RPC:
+
+- `-32600`: Solicitud inválida (JSON-RPC malformado)
+- `-32601`: Método no encontrado  
+- `-32602`: Parámetros inválidos
+- `-32603`: Error interno del servidor
+- `-32000`: Errores de estado (ej: ping sin inicializar)
 
 ## Arquitectura
 
@@ -135,14 +223,27 @@ Usar cualquier cliente compatible con MCP 2024-11-05 apuntando a los endpoints `
 │   Cliente MCP   │───▶│  Polenta Server │───▶│   PrestoDB      │
 │  (VSCode, etc.) │    │  (Spring Boot)  │    │   Data Lake     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                    POST /mcp (JSON-RPC 2.0)
+                              │
+                    ┌─────────▼──────────┐
+                    │ McpDispatcherService│
+                    └─────────┬──────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        initialize         ping         tools/list,call
 ```
 
 ### Componentes Principales
 
-- **McpController**: Endpoints MCP-compliant
+- **McpJsonRpcController**: Endpoint JSON-RPC estándar `/mcp`
+- **McpDispatcherService**: Enrutamiento y manejo de métodos JSON-RPC
+- **McpController**: Endpoints helper REST (opcional, solo desarrollo)
 - **QueryIntelligenceService**: Procesamiento de lenguaje natural
 - **PrestoService**: Integración con PrestoDB
-- **Modelos MCP**: Request/Response según especificación
+- **Modelos MCP**: Request/Response según especificación JSON-RPC 2.0
 
 ## Configuración de Seguridad
 

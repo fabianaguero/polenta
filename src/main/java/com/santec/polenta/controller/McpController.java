@@ -1,7 +1,6 @@
 package com.santec.polenta.controller;
 
-import com.santec.polenta.service.QueryIntelligenceService;
-import com.santec.polenta.service.PrestoService;
+import com.santec.polenta.service.McpDispatcherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -10,38 +9,29 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
 
 @RestController
 @RequestMapping("/mcp")
 @CrossOrigin(origins = "*")
-@Tag(name = "MCP", description = "Endpoints para interactuar con el servidor MCP")
+@ConditionalOnProperty(name = "mcp.helpers.enabled", havingValue = "true", matchIfMissing = true)
+@Tag(name = "MCP Helpers", description = "Non-standard helper endpoints - use POST /mcp for standard MCP compliance")
 public class McpController {
 
     private static final Logger logger = LoggerFactory.getLogger(McpController.class);
 
     @Autowired
-    private QueryIntelligenceService queryIntelligenceService;
-
-    @Autowired
-    private PrestoService prestoService;
-
-    @Value("${mcp.server.name}")
-    private String serverName;
-
-    @Value("${mcp.server.version}")
-    private String serverVersion;
-
-    @Value("${mcp.server.description}")
-    private String serverDescription;
+    private McpDispatcherService dispatcherService;
 
     @PostMapping("/initialize")
     @Operation(
-            summary = "Inicializa la conexión con el servidor MCP",
+            summary = "[HELPER] Inicializa la conexión con el servidor MCP",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
@@ -54,20 +44,28 @@ public class McpController {
             )
     )
     public ResponseEntity<Map<String, Object>> initialize(
-            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
-        logger.info("Invocación a /mcp/initialize con parámetros: {}", request);
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request,
+            HttpServletRequest httpRequest) {
+        logger.info("Helper endpoint /mcp/initialize called with parameters: {}", request);
+        
+        // Extract fields for internal JSON-RPC call
         String id = (String) request.get("id");
-        Map<String, Object> result = new HashMap<>();
-        result.put("protocolVersion", "2024-11-05");
-        result.put("capabilities", getServerCapabilities());
-        result.put("serverInfo", getServerInfo());
-        logger.info("Respuesta de /mcp/initialize: {}", result);
-        return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        String sessionId = generateSessionId(httpRequest);
+        
+        try {
+            Map<String, Object> result = dispatcherService.dispatch("initialize", params, sessionId);
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        } catch (Exception e) {
+            logger.error("Error in helper initialize endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
+        }
     }
 
     @PostMapping("/tools/list")
     @Operation(
-            summary = "Lista las herramientas disponibles",
+            summary = "[HELPER] Lista las herramientas disponibles",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
@@ -81,26 +79,24 @@ public class McpController {
     )
     public ResponseEntity<Map<String, Object>> listTools(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
-        logger.info("Invocación a /mcp/tools/list con parámetros: {}", request);
+        logger.info("Helper endpoint /mcp/tools/list called with parameters: {}", request);
+        
         String id = (String) request.get("id");
-        List<Map<String, Object>> tools = Arrays.asList(
-                createTool("query_data", "Execute natural language or SQL queries against the data lake", createQuerySchema()),
-                createTool("list_tables", "List all available tables in the data lake", createListTablesSchema()),
-                createTool("accessible_tables", "List tables the user has permission to query", createAccessibleTablesSchema()),
-                createTool("describe_table", "Get detailed information about a specific table structure", createDescribeTableSchema()),
-                createTool("sample_data", "Get sample data from a specific table", createSampleDataSchema()),
-                createTool("search_tables", "Search for tables containing specific keywords", createSearchTablesSchema()),
-                createTool("get_suggestions", "Get helpful query suggestions for users", createSuggestionsSchema())
-        );
-        Map<String, Object> result = new HashMap<>();
-        result.put("tools", tools);
-        logger.info("Respuesta de /mcp/tools/list: {}", result);
-        return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        
+        try {
+            Map<String, Object> result = dispatcherService.dispatch("tools/list", params, null);
+            return ResponseEntity.ok(jsonRpcSuccess(id, result));
+        } catch (Exception e) {
+            logger.error("Error in helper tools/list endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
+        }
     }
 
     @PostMapping("/tools/call")
     @Operation(
-            summary = "Ejecuta una herramienta específica",
+            summary = "[HELPER] Ejecuta una herramienta específica",
+            description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
@@ -114,34 +110,43 @@ public class McpController {
     )
     public ResponseEntity<Map<String, Object>> callTool(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
-        logger.info("Invocación a /mcp/tools/call con parámetros: {}", request);
+        logger.info("Helper endpoint /mcp/tools/call called with parameters: {}", request);
+        
         String id = (String) request.get("id");
+        Map<String, Object> params = (Map<String, Object>) request.get("params");
+        
         try {
-            Map<String, Object> params = (Map<String, Object>) request.get("params");
-            if (params == null) {
-                logger.warn("Faltan parámetros 'params' en la invocación.");
-                return ResponseEntity.ok(jsonRpcError(id, -32602, "Faltan parámetros 'params'", null));
-            }
-            String toolName = (String) params.get("name");
-            Map<String, Object> arguments = (Map<String, Object>) params.get("arguments");
-            if (toolName == null) {
-                logger.warn("Falta el parámetro 'name' en 'params'.");
-                return ResponseEntity.ok(jsonRpcError(id, -32602, "Falta el parámetro 'name' en 'params'", null));
-            }
-            logger.info("Ejecutando tool: {} con argumentos: {}", toolName, arguments);
-            Map<String, Object> result = executeToolCall(toolName, arguments);
-            logger.info("Respuesta de /mcp/tools/call para tool '{}': {}", toolName, result);
+            Map<String, Object> result = dispatcherService.dispatch("tools/call", params, null);
             return ResponseEntity.ok(jsonRpcSuccess(id, result));
         } catch (IllegalArgumentException e) {
-            logger.warn("Error de parámetros en tools/call: {}", e.getMessage());
+            logger.warn("Invalid parameters in helper tools/call: {}", e.getMessage());
             return ResponseEntity.ok(jsonRpcError(id, -32602, e.getMessage(), null));
         } catch (Exception e) {
-            logger.error("Error ejecutando tool: {}", e.getMessage(), e);
-            return ResponseEntity.ok(jsonRpcError(id, -32000, "Tool execution failed: " + e.getMessage(), null));
+            logger.error("Error in helper tools/call endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
         }
     }
 
-    // --- Utilidades JSON-RPC ---
+    // --- Utility methods for helper endpoints ---
+
+    private String generateSessionId(HttpServletRequest request) {
+        // Simple session ID generation based on client characteristics
+        String clientIp = getClientIpAddress(request);
+        String userAgent = request.getHeader("User-Agent");
+        return String.valueOf((clientIp + userAgent).hashCode());
+    }
+
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
+    }
 
     private Map<String, Object> jsonRpcSuccess(String id, Object result) {
         Map<String, Object> response = new HashMap<>();
@@ -161,144 +166,5 @@ public class McpController {
         if (data != null) error.put("data", data);
         response.put("error", error);
         return response;
-    }
-
-    // --- Lógica de herramientas y schemas ---
-
-    private Map<String, Object> executeToolCall(String toolName, Map<String, Object> arguments) {
-        switch (toolName) {
-            case "query_data":
-                if (arguments == null || arguments.get("query") == null) {
-                    throw new IllegalArgumentException("El parámetro 'query' es obligatorio y no puede ser null");
-                }
-                String query = (String) arguments.get("query");
-                return queryIntelligenceService.processNaturalQuery(query);
-            case "list_tables":
-                return queryIntelligenceService.processNaturalQuery("show all tables");
-            case "accessible_tables":
-                return queryIntelligenceService.processNaturalQuery("show accessible tables");
-            case "describe_table":
-                if (arguments == null || arguments.get("table_name") == null) {
-                    throw new IllegalArgumentException("El parámetro 'table_name' es obligatorio y no puede ser null");
-                }
-                String tableName = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("describe table " + tableName);
-            case "sample_data":
-                if (arguments == null || arguments.get("table_name") == null) {
-                    throw new IllegalArgumentException("El parámetro 'table_name' es obligatorio y no puede ser null");
-                }
-                String sampleTable = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("show sample data from " + sampleTable);
-            case "search_tables":
-                if (arguments == null || arguments.get("keyword") == null) {
-                    throw new IllegalArgumentException("El parámetro 'keyword' es obligatorio y no puede ser null");
-                }
-                String keyword = (String) arguments.get("keyword");
-                return queryIntelligenceService.processNaturalQuery("search for " + keyword);
-            case "get_suggestions":
-                Map<String, Object> suggestions = new HashMap<>();
-                suggestions.put("type", "suggestions");
-                suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
-                suggestions.put("message", "Helpful query suggestions");
-                return suggestions;
-            default:
-                throw new IllegalArgumentException("Unknown tool: " + toolName);
-        }
-    }
-
-    private Map<String, Object> getServerCapabilities() {
-        Map<String, Object> capabilities = new HashMap<>();
-        capabilities.put("tools", Map.of("listChanged", false));
-        capabilities.put("resources", Map.of("subscribe", false, "listChanged", false));
-        return capabilities;
-    }
-
-    private Map<String, Object> getServerInfo() {
-        Map<String, Object> serverInfo = new HashMap<>();
-        serverInfo.put("name", serverName);
-        serverInfo.put("version", serverVersion);
-        serverInfo.put("description", serverDescription);
-        return serverInfo;
-    }
-
-    private Map<String, Object> createTool(String name, String description, Map<String, Object> inputSchema) {
-        Map<String, Object> tool = new HashMap<>();
-        tool.put("name", name);
-        tool.put("description", description);
-        tool.put("input_schema", inputSchema);
-        return tool;
-    }
-
-    private Map<String, Object> createQuerySchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-                "query", Map.of(
-                        "type", "string",
-                        "description", "Natural language query or SQL statement to execute"
-                )
-        ));
-        schema.put("required", Arrays.asList("query"));
-        return schema;
-    }
-
-    private Map<String, Object> createListTablesSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of());
-        return schema;
-    }
-
-    private Map<String, Object> createAccessibleTablesSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of());
-        return schema;
-    }
-
-    private Map<String, Object> createDescribeTableSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-                "table_name", Map.of(
-                        "type", "string",
-                        "description", "Name of the table to describe (format: schema.table or just table)"
-                )
-        ));
-        schema.put("required", Arrays.asList("table_name"));
-        return schema;
-    }
-
-    private Map<String, Object> createSampleDataSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-                "table_name", Map.of(
-                        "type", "string",
-                        "description", "Name of the table to get sample data from"
-                )
-        ));
-        schema.put("required", Arrays.asList("table_name"));
-        return schema;
-    }
-
-    private Map<String, Object> createSearchTablesSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of(
-                "keyword", Map.of(
-                        "type", "string",
-                        "description", "Keyword to search for in table names"
-                )
-        ));
-        schema.put("required", Arrays.asList("keyword"));
-        return schema;
-    }
-
-    private Map<String, Object> createSuggestionsSchema() {
-        Map<String, Object> schema = new HashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", Map.of());
-        return schema;
     }
 }
