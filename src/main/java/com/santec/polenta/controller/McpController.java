@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.*;
+import ch.qos.logback.classic.Level;
 
 @RestController
 @RequestMapping("/mcp")
@@ -61,6 +62,8 @@ public class McpController {
             return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
         }
     }
+
+ 
 
     @PostMapping("/tools/list")
     @Operation(
@@ -127,6 +130,7 @@ public class McpController {
         }
     }
 
+
     // --- Utility methods for helper endpoints ---
 
     private String generateSessionId(HttpServletRequest request) {
@@ -134,6 +138,8 @@ public class McpController {
         String clientIp = getClientIpAddress(request);
         String userAgent = request.getHeader("User-Agent");
         return String.valueOf((clientIp + userAgent).hashCode());
+
+
     }
 
     private String getClientIpAddress(HttpServletRequest request) {
@@ -154,6 +160,7 @@ public class McpController {
         response.put("id", id);
         response.put("result", result);
         return response;
+
     }
 
     private Map<String, Object> jsonRpcError(String id, int code, String message, Object data) {

@@ -12,9 +12,11 @@ presto:
   url: ${PRESTO_URL:jdbc:presto://localhost:8081/tpch/sf1}
   user: ${PRESTO_USER:admin}
   password: ${PRESTO_PASSWORD:}
+
   catalog: ${PRESTO_CATALOG:tpch}
   schema: ${PRESTO_SCHEMA:sf1}
   query-timeout: 30000
+
 
 
 # MCP Server Configuration
