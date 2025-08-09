@@ -53,6 +53,8 @@ public class McpDispatcherService {
             }
         } catch (IllegalArgumentException e) {
             throw e; // Re-throw for -32601 (method not found) or -32602 (invalid params)
+        } catch (IllegalStateException e) {
+            throw e; // Re-throw for state errors like ping without initialize
         } catch (Exception e) {
             logger.error("Internal error dispatching method {}: {}", method, e.getMessage(), e);
             throw new RuntimeException("Internal error: " + e.getMessage(), e);
