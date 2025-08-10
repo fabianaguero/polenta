@@ -18,7 +18,7 @@ public class PrestoService {
     private PrestoConfig prestoConfig;
 
     // Puedes parametrizar el catálogo si lo necesitas
-    private final String catalog = "tpch";
+    // Se obtiene dinámicamente desde la configuración
 
     public List<Map<String, Object>> executeQuery(String sql) throws SQLException {
         logger.info("Ejecutando consulta: {}", sql);
@@ -51,18 +51,19 @@ public class PrestoService {
         return results;
     }
 
-    public List<String> getSchemas() {
-        logger.debug("Solo se puede acceder al esquema por defecto configurado en la URL JDBC.");
-        // Extrae el esquema de la URL de conexión
-        String url = prestoConfig.getUrl();
-        String schema = "default";
-        int lastSlash = url.lastIndexOf('/');
-        if (lastSlash != -1 && lastSlash + 1 < url.length()) {
-            schema = url.substring(lastSlash + 1);
-        }
+    public List<String> getSchemas() throws SQLException {
+        String catalog = getCatalogName();
+        logger.debug("Obteniendo esquemas del catálogo: {}", catalog);
+        String sql = String.format(
+                "SELECT schema_name FROM %s.information_schema.schemata",
+                catalog
+        );
+        List<Map<String, Object>> results = executeQuery(sql);
         List<String> schemas = new ArrayList<>();
-        schemas.add(schema);
-        logger.debug("Esquema detectado: {}", schemas);
+        for (Map<String, Object> row : results) {
+            schemas.add((String) row.get("schema_name"));
+        }
+        logger.debug("Esquemas encontrados: {}", schemas);
         return schemas;
     }
 
@@ -93,7 +94,7 @@ public class PrestoService {
         logger.debug("Buscando tablas que contengan la palabra clave: {}", keyword);
         String sql = String.format(
                 "SELECT table_schema, table_name FROM %s.information_schema.tables WHERE LOWER(table_name) LIKE '%%%s%%'",
-                catalog, keyword.toLowerCase()
+                getCatalogName(), keyword.toLowerCase()
         );
         List<Map<String, Object>> results = executeQuery(sql);
         List<String> matchingTables = new ArrayList<>();
@@ -112,6 +113,15 @@ public class PrestoService {
         List<Map<String, Object>> data = executeQuery(sql);
         logger.debug("Datos de muestra de {}.{}: {}", schema, table, data);
         return data;
+    }
+
+    private String getCatalogName() {
+        if (prestoConfig.getCatalog() != null && !prestoConfig.getCatalog().isEmpty()) {
+            return prestoConfig.getCatalog();
+        }
+        String url = prestoConfig.getUrl();
+        String[] parts = url.split("/");
+        return parts.length >= 4 ? parts[3] : "";
     }
 
     private Connection getConnection() throws SQLException {
@@ -160,7 +170,10 @@ public class PrestoService {
 
     public List<String> getAccessibleTables() throws SQLException {
         logger.debug("Obteniendo tablas accesibles para el usuario...");
-        String sql = String.format("SELECT table_schema, table_name FROM %s.information_schema.tables", catalog);
+        String sql = String.format(
+                "SELECT table_schema, table_name FROM %s.information_schema.tables",
+                getCatalogName()
+        );
         List<Map<String, Object>> results = executeQuery(sql);
         List<String> accessibleTables = new ArrayList<>();
         for (Map<String, Object> row : results) {
