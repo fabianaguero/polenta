@@ -17,30 +17,32 @@ public class PrestoService {
     @Autowired
     private PrestoConfig prestoConfig;
 
-    // Puedes parametrizar el catálogo si lo necesitas
-    // Se obtiene dinámicamente desde la configuración
-
-    public List<Map<String, Object>> executeQuery(String sql) throws SQLException {
+    public List<Map<String, Object>> executeQuery(String sql, Object... params) throws SQLException {
         logger.info("Ejecutando consulta: {}", sql);
         List<Map<String, Object>> results = new ArrayList<>();
 
         try (Connection connection = getConnection();
-             Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
+             PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
+            for (int i = 0; i < params.length; i++) {
+                statement.setObject(i + 1, params[i]);
+            }
 
-            logger.debug("Columnas detectadas: {}", columnCount);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                ResultSetMetaData metaData = resultSet.getMetaData();
+                int columnCount = metaData.getColumnCount();
 
-            while (resultSet.next()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = metaData.getColumnLabel(i);
-                    Object value = resultSet.getObject(i);
-                    row.put(columnName, value);
+                logger.debug("Columnas detectadas: {}", columnCount);
+
+                while (resultSet.next()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    for (int i = 1; i <= columnCount; i++) {
+                        String columnName = metaData.getColumnLabel(i);
+                        Object value = resultSet.getObject(i);
+                        row.put(columnName, value);
+                    }
+                    results.add(row);
                 }
-                results.add(row);
             }
             logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
         } catch (SQLException e) {
@@ -52,7 +54,7 @@ public class PrestoService {
     }
 
     public List<String> getSchemas() throws SQLException {
-        String catalog = getCatalogName();
+        String catalog = prestoConfig.getCatalog();
         logger.debug("Obteniendo esquemas del catálogo: {}", catalog);
         String sql = String.format(
                 "SELECT schema_name FROM %s.information_schema.schemata",
@@ -70,10 +72,10 @@ public class PrestoService {
     public List<String> getTables(String schema) throws SQLException {
         logger.debug("Obteniendo tablas del esquema: {}", schema);
         String sql = String.format(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = '%s'",
-                schema
+                "SELECT table_name FROM %s.information_schema.tables WHERE table_schema = ?",
+                prestoConfig.getCatalog()
         );
-        List<Map<String, Object>> results = executeQuery(sql);
+        List<Map<String, Object>> results = executeQuery(sql, schema);
         List<String> tables = new ArrayList<>();
         for (Map<String, Object> row : results) {
             tables.add((String) row.get("table_name"));
@@ -84,8 +86,11 @@ public class PrestoService {
 
     public List<Map<String, Object>> getTableColumns(String schema, String table) throws SQLException {
         logger.debug("Obteniendo columnas de la tabla: {}.{}", schema, table);
-        String sql = String.format("DESCRIBE %s.%s", schema, table);
-        List<Map<String, Object>> columns = executeQuery(sql);
+        String sql = String.format(
+                "SELECT column_name, data_type FROM %s.information_schema.columns WHERE table_schema = ? AND table_name = ?",
+                prestoConfig.getCatalog()
+        );
+        List<Map<String, Object>> columns = executeQuery(sql, schema, table);
         logger.debug("Columnas de {}.{}: {}", schema, table, columns);
         return columns;
     }
@@ -93,10 +98,10 @@ public class PrestoService {
     public List<String> searchTables(String keyword) throws SQLException {
         logger.debug("Buscando tablas que contengan la palabra clave: {}", keyword);
         String sql = String.format(
-                "SELECT table_schema, table_name FROM %s.information_schema.tables WHERE LOWER(table_name) LIKE '%%%s%%'",
-                getCatalogName(), keyword.toLowerCase()
+                "SELECT table_schema, table_name FROM %s.information_schema.tables WHERE LOWER(table_name) LIKE ?",
+                prestoConfig.getCatalog()
         );
-        List<Map<String, Object>> results = executeQuery(sql);
+        List<Map<String, Object>> results = executeQuery(sql, "%" + keyword.toLowerCase() + "%");
         List<String> matchingTables = new ArrayList<>();
         for (Map<String, Object> row : results) {
             String schema = (String) row.get("table_schema");
@@ -113,15 +118,6 @@ public class PrestoService {
         List<Map<String, Object>> data = executeQuery(sql);
         logger.debug("Datos de muestra de {}.{}: {}", schema, table, data);
         return data;
-    }
-
-    private String getCatalogName() {
-        if (prestoConfig.getCatalog() != null && !prestoConfig.getCatalog().isEmpty()) {
-            return prestoConfig.getCatalog();
-        }
-        String url = prestoConfig.getUrl();
-        String[] parts = url.split("/");
-        return parts.length >= 4 ? parts[3] : "";
     }
 
     private Connection getConnection() throws SQLException {
@@ -172,7 +168,7 @@ public class PrestoService {
         logger.debug("Obteniendo tablas accesibles para el usuario...");
         String sql = String.format(
                 "SELECT table_schema, table_name FROM %s.information_schema.tables",
-                getCatalogName()
+                prestoConfig.getCatalog()
         );
         List<Map<String, Object>> results = executeQuery(sql);
         List<String> accessibleTables = new ArrayList<>();
