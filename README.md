@@ -46,6 +46,8 @@ mcp:
     enabled: true  # Habilitar endpoints helper (desactivar en producción)
 ```
 
+El parámetro `presto.query-timeout` define el tiempo máximo permitido para la ejecución de consultas (en milisegundos).
+
 3. **Compilar y ejecutar**
  ```bash
  mvn clean install
