@@ -23,40 +23,58 @@ public class PrestoService {
 
     public List<Map<String, Object>> executeQuery(String sql, Object... params) throws SQLException {
         logger.info("Ejecutando consulta: {}", sql);
-        List<Map<String, Object>> results = new ArrayList<>();
 
-        try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        int maxRetries = prestoConfig.getMaxRetries();
+        long backoff = prestoConfig.getRetryBackoffMs();
+        int attempt = 0;
 
-            statement.setQueryTimeout((int) prestoConfig.getQueryTimeout());
+        while (true) {
+            List<Map<String, Object>> results = new ArrayList<>();
+            try (Connection connection = getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            for (int i = 0; i < params.length; i++) {
-                statement.setObject(i + 1, params[i]);
-            }
+                statement.setQueryTimeout((int) prestoConfig.getQueryTimeout());
 
-            try (ResultSet resultSet = statement.executeQuery()) {
-                ResultSetMetaData metaData = resultSet.getMetaData();
-                int columnCount = metaData.getColumnCount();
+                for (int i = 0; i < params.length; i++) {
+                    statement.setObject(i + 1, params[i]);
+                }
 
-                logger.debug("Columnas detectadas: {}", columnCount);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    ResultSetMetaData metaData = resultSet.getMetaData();
+                    int columnCount = metaData.getColumnCount();
 
-                while (resultSet.next()) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    for (int i = 1; i <= columnCount; i++) {
-                        String columnName = metaData.getColumnLabel(i);
-                        Object value = resultSet.getObject(i);
-                        row.put(columnName, value);
+                    logger.debug("Columnas detectadas: {}", columnCount);
+
+                    while (resultSet.next()) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            String columnName = metaData.getColumnLabel(i);
+                            Object value = resultSet.getObject(i);
+                            row.put(columnName, value);
+                        }
+                        results.add(row);
                     }
-                    results.add(row);
+                }
+                logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
+                return results;
+            } catch (SQLException e) {
+                Throwable cause = e.getCause();
+                if ((cause instanceof java.net.SocketException || cause instanceof SQLTransientException)
+                        && attempt < maxRetries) {
+                    attempt++;
+                    logger.warn("Fallo en la consulta, reintento {} de {} en {} ms", attempt, maxRetries, backoff, e);
+                    try {
+                        Thread.sleep(backoff);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("Thread interrupted during retry", ie);
+                    }
+                } else {
+                    logger.error("Error ejecutando consulta: {} | SQL: {}", e.getMessage(), sql, e);
+                    throw e;
                 }
             }
-            logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
-        } catch (SQLException e) {
-            logger.error("Error ejecutando consulta: {} | SQL: {}", e.getMessage(), sql, e);
-            throw e;
         }
-
-        return results;
     }
 
     public List<String> getSchemas() throws SQLException {
