@@ -1,5 +1,6 @@
 package com.santec.polenta.service;
 
+import com.santec.polenta.config.PrestoConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,9 @@ public class QueryIntelligenceService {
 
     @Autowired
     private PrestoService prestoService;
+
+    @Autowired
+    private PrestoConfig prestoConfig;
 
     private static final Map<Pattern, String> QUERY_PATTERNS;
     static {
@@ -118,7 +122,7 @@ public class QueryIntelligenceService {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        String schema = parts.length > 1 ? parts[0] : "default";
+        String schema = parts.length > 1 ? parts[0] : prestoConfig.getSchema();
         String table = parts.length > 1 ? parts[1] : parts[0];
         List<Map<String, Object>> columns = prestoService.getTableColumns(schema, table);
         Map<String, Object> response = new HashMap<>();
@@ -136,7 +140,7 @@ public class QueryIntelligenceService {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        String schema = parts.length > 1 ? parts[0] : "default";
+        String schema = parts.length > 1 ? parts[0] : prestoConfig.getSchema();
         String table = parts.length > 1 ? parts[1] : parts[0];
         List<Map<String, Object>> sampleData = prestoService.getSampleData(schema, table);
         Map<String, Object> response = new HashMap<>();
