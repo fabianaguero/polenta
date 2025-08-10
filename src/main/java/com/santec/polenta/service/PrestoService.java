@@ -17,9 +17,6 @@ public class PrestoService {
     @Autowired
     private PrestoConfig prestoConfig;
 
-    // Puedes parametrizar el catálogo si lo necesitas
-    private final String catalog = "tpch";
-
     public List<Map<String, Object>> executeQuery(String sql) throws SQLException {
         logger.info("Ejecutando consulta: {}", sql);
         List<Map<String, Object>> results = new ArrayList<>();
@@ -68,14 +65,17 @@ public class PrestoService {
 
     public List<String> getTables(String schema) throws SQLException {
         logger.debug("Obteniendo tablas del esquema: {}", schema);
-        String sql = String.format(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = '%s'",
-                schema
-        );
-        List<Map<String, Object>> results = executeQuery(sql);
+        String catalog = prestoConfig.getCatalog();
+        String sql = "SELECT table_name FROM " + catalog + ".information_schema.tables WHERE table_schema = ?";
         List<String> tables = new ArrayList<>();
-        for (Map<String, Object> row : results) {
-            tables.add((String) row.get("table_name"));
+        try (Connection connection = getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, schema);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    tables.add(rs.getString("table_name"));
+                }
+            }
         }
         logger.debug("Tablas encontradas en {}: {}", schema, tables);
         return tables;
@@ -91,16 +91,19 @@ public class PrestoService {
 
     public List<String> searchTables(String keyword) throws SQLException {
         logger.debug("Buscando tablas que contengan la palabra clave: {}", keyword);
-        String sql = String.format(
-                "SELECT table_schema, table_name FROM %s.information_schema.tables WHERE LOWER(table_name) LIKE '%%%s%%'",
-                catalog, keyword.toLowerCase()
-        );
-        List<Map<String, Object>> results = executeQuery(sql);
+        String catalog = prestoConfig.getCatalog();
+        String sql = "SELECT table_schema, table_name FROM " + catalog + ".information_schema.tables WHERE LOWER(table_name) LIKE ?";
         List<String> matchingTables = new ArrayList<>();
-        for (Map<String, Object> row : results) {
-            String schema = (String) row.get("table_schema");
-            String table = (String) row.get("table_name");
-            matchingTables.add(schema + "." + table);
+        try (Connection connection = getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, "%" + keyword.toLowerCase() + "%");
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String schema = rs.getString("table_schema");
+                    String table = rs.getString("table_name");
+                    matchingTables.add(schema + "." + table);
+                }
+            }
         }
         logger.debug("Tablas encontradas con la palabra clave '{}': {}", keyword, matchingTables);
         return matchingTables;
@@ -160,14 +163,18 @@ public class PrestoService {
 
     public List<String> getAccessibleTables() throws SQLException {
         logger.debug("Obteniendo tablas accesibles para el usuario...");
-        String sql = String.format("SELECT table_schema, table_name FROM %s.information_schema.tables", catalog);
-        List<Map<String, Object>> results = executeQuery(sql);
+        String catalog = prestoConfig.getCatalog();
+        String sql = "SELECT table_schema, table_name FROM " + catalog + ".information_schema.tables";
         List<String> accessibleTables = new ArrayList<>();
-        for (Map<String, Object> row : results) {
-            String schema = (String) row.get("table_schema");
-            String table = (String) row.get("table_name");
-            if (canAccessTable(schema, table)) {
-                accessibleTables.add(schema + "." + table);
+        try (Connection connection = getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String schema = rs.getString("table_schema");
+                String table = rs.getString("table_name");
+                if (canAccessTable(schema, table)) {
+                    accessibleTables.add(schema + "." + table);
+                }
             }
         }
         logger.debug("Tablas accesibles: {}", accessibleTables);
