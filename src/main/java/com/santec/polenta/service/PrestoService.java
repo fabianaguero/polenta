@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.util.*;
 
@@ -16,6 +17,9 @@ public class PrestoService {
 
     @Autowired
     private PrestoConfig prestoConfig;
+
+    @Autowired
+    private DataSource dataSource;
 
     public List<Map<String, Object>> executeQuery(String sql, Object... params) throws SQLException {
         logger.info("Ejecutando consulta: {}", sql);
@@ -121,22 +125,10 @@ public class PrestoService {
     }
 
     private Connection getConnection() throws SQLException {
-        logger.debug("Creando conexión JDBC a Presto: {}", prestoConfig.getUrl());
-        Properties properties = new Properties();
-        properties.setProperty("user", prestoConfig.getUser());
-        if (prestoConfig.getPassword() != null && !prestoConfig.getPassword().isEmpty()) {
-            properties.setProperty("password", prestoConfig.getPassword());
-        }
-        int previousLoginTimeout = DriverManager.getLoginTimeout();
-        int connectionTimeoutSeconds = 30;
-        DriverManager.setLoginTimeout(connectionTimeoutSeconds);
-        try {
-            Connection conn = DriverManager.getConnection(prestoConfig.getUrl(), properties);
-            logger.debug("Conexión establecida correctamente");
-            return conn;
-        } finally {
-            DriverManager.setLoginTimeout(previousLoginTimeout);
-        }
+        logger.debug("Obteniendo conexión del pool configurado para Presto");
+        Connection conn = dataSource.getConnection();
+        logger.debug("Conexión establecida correctamente");
+        return conn;
     }
 
     public boolean testConnection() {

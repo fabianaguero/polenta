@@ -1,7 +1,12 @@
 package com.santec.polenta.config;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import javax.sql.DataSource;
 
 /**
  * Configuration properties for connecting to PrestoDB.
@@ -21,8 +26,10 @@ public class PrestoConfig {
     /** Default schema used for queries */
     private String schema;
 
-    ///** Connection timeout in milliseconds applied to the JDBC login process */
-    //private long connectionTimeout;
+    /** Maximum number of connections in the pool */
+    private int maxPoolSize = 10;
+    /** Connection timeout in milliseconds for the pool */
+    private long connectionTimeout = 30000L;
 
     /** Query timeout in milliseconds */
     private long queryTimeout;
@@ -67,6 +74,21 @@ public class PrestoConfig {
         this.schema = schema;
     }
 
+    public int getMaxPoolSize() {
+        return maxPoolSize;
+    }
+
+    public void setMaxPoolSize(int maxPoolSize) {
+        this.maxPoolSize = maxPoolSize;
+    }
+
+    public long getConnectionTimeout() {
+        return connectionTimeout;
+    }
+
+    public void setConnectionTimeout(long connectionTimeout) {
+        this.connectionTimeout = connectionTimeout;
+    }
 
     public long getQueryTimeout() {
         return queryTimeout;
@@ -74,5 +96,20 @@ public class PrestoConfig {
 
     public void setQueryTimeout(long queryTimeout) {
         this.queryTimeout = queryTimeout;
+    }
+
+    @Bean
+    public DataSource dataSource() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(url);
+        config.setUsername(user);
+        if (password != null && !password.isEmpty()) {
+            config.setPassword(password);
+        }
+        config.setDriverClassName("io.prestosql.jdbc.Driver");
+        config.setMaximumPoolSize(maxPoolSize);
+        config.setConnectionTimeout(connectionTimeout);
+        config.setInitializationFailTimeout(-1);
+        return new HikariDataSource(config);
     }
 }
