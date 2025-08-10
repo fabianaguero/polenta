@@ -128,7 +128,7 @@ public class PrestoConfig {
         if (password != null && !password.isEmpty()) {
             config.setPassword(password);
         }
-        config.setDriverClassName("io.prestosql.jdbc.Driver");
+        config.setDriverClassName("io.prestosql.jdbc.PrestoDriver");
         config.setMaximumPoolSize(maxPoolSize);
         config.setConnectionTimeout(connectionTimeout);
         config.setInitializationFailTimeout(-1);
