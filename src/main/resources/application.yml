@@ -9,7 +9,7 @@ spring:
 
 # PrestoDB Configuration
 presto:
-    url: ${PRESTO_URL:jdbc:presto://localhost:8081/tpch/sf1}
+    url: ${PRESTO_URL:jdbc:presto://localhost:8080/tpch/sf1}
     user: ${PRESTO_USER:admin}
     password: ${PRESTO_PASSWORD:}
 

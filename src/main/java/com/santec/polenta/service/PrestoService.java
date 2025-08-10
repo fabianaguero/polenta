@@ -58,6 +58,7 @@ public class PrestoService {
                 logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
                 return results;
             } catch (SQLException e) {
+                logger.error("Error ejecutando consulta SQL: {} | SQLState: {} | ErrorCode: {} | Causa: {}", sql, e.getSQLState(), e.getErrorCode(), (e.getCause() != null ? e.getCause().getMessage() : "null"), e);
                 Throwable cause = e.getCause();
                 if ((cause instanceof java.net.SocketException || cause instanceof SQLTransientException)
                         && attempt < maxRetries) {
