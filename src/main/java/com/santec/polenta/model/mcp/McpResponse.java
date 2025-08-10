@@ -1,27 +1,28 @@
 package com.santec.polenta.model.mcp;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * MCP (Model Context Protocol) Response model
  * Represents the standard MCP response format
  */
+@Data
+@NoArgsConstructor
 public class McpResponse<T> {
-    
+
     @JsonProperty("jsonrpc")
     private String jsonrpc = "2.0";
-    
+
     @JsonProperty("id")
     private String id;
-    
+
     @JsonProperty("result")
     private T result;
-    
+
     @JsonProperty("error")
     private McpError error;
-
-    // Constructors
-    public McpResponse() {}
 
     public McpResponse(String id, T result) {
         this.id = id;
@@ -40,38 +41,5 @@ public class McpResponse<T> {
 
     public static <T> McpResponse<T> error(String id, McpError error) {
         return new McpResponse<>(id, error);
-    }
-
-    // Getters and Setters
-    public String getJsonrpc() {
-        return jsonrpc;
-    }
-
-    public void setJsonrpc(String jsonrpc) {
-        this.jsonrpc = jsonrpc;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public T getResult() {
-        return result;
-    }
-
-    public void setResult(T result) {
-        this.result = result;
-    }
-
-    public McpError getError() {
-        return error;
-    }
-
-    public void setError(McpError error) {
-        this.error = error;
     }
 }
