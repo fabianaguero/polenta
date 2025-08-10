@@ -34,6 +34,12 @@ public class PrestoConfig {
     /** Query timeout in milliseconds */
     private long queryTimeout;
 
+    /** Maximum number of retry attempts for transient failures */
+    private int maxRetries = 3;
+
+    /** Delay in milliseconds before retrying a failed query */
+    private long retryBackoffMs = 1000L;
+
     public String getUrl() {
         return url;
     }
@@ -96,6 +102,22 @@ public class PrestoConfig {
 
     public void setQueryTimeout(long queryTimeout) {
         this.queryTimeout = queryTimeout;
+    }
+
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public void setMaxRetries(int maxRetries) {
+        this.maxRetries = maxRetries;
+    }
+
+    public long getRetryBackoffMs() {
+        return retryBackoffMs;
+    }
+
+    public void setRetryBackoffMs(long retryBackoffMs) {
+        this.retryBackoffMs = retryBackoffMs;
     }
 
     @Bean
