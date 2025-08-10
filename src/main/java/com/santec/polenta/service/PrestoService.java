@@ -45,7 +45,9 @@ public class PrestoService {
 
                     logger.debug("Columnas detectadas: {}", columnCount);
 
-                    while (resultSet.next()) {
+                    int maxRows = 10; // Puedes ajustar este valor o parametrizarlo según necesidad
+                    int rowCount = 0;
+                    while (resultSet.next() && rowCount < maxRows) {
                         Map<String, Object> row = new LinkedHashMap<>();
                         for (int i = 1; i <= columnCount; i++) {
                             String columnName = metaData.getColumnLabel(i);
@@ -53,6 +55,7 @@ public class PrestoService {
                             row.put(columnName, value);
                         }
                         results.add(row);
+                        rowCount++;
                     }
                 }
                 logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
@@ -164,15 +167,24 @@ public class PrestoService {
         }
     }
 
+    // Mapa en memoria para cachear el acceso a tablas: clave "schema.table", valor true/false
+    private final Map<String, Boolean> accessTableCache = new HashMap<>();
+
     public boolean canAccessTable(String schema, String table) {
+        String key = schema + "." + table;
+        if (accessTableCache.containsKey(key)) {
+            return accessTableCache.get(key);
+        }
         logger.debug("Verificando acceso a la tabla: {}.{}", schema, table);
         try {
             String sql = String.format("SELECT 1 FROM %s.%s LIMIT 1", schema, table);
             executeQuery(sql);
             logger.debug("Acceso permitido a la tabla: {}.{}", schema, table);
+            accessTableCache.put(key, true);
             return true;
         } catch (SQLException e) {
             logger.debug("Sin acceso a la tabla {}.{}: {}", schema, table, e.getMessage());
+            accessTableCache.put(key, false);
             return false;
         }
     }
