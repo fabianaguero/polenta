@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.sql.SQLException;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class QueryIntelligenceService {
@@ -21,6 +21,9 @@ public class QueryIntelligenceService {
 
     @Autowired
     private PrestoConfig prestoConfig;
+
+    @Autowired
+    private TokenizerService tokenizerService;
 
     private static final Map<Pattern, String> QUERY_PATTERNS;
     static {
@@ -122,8 +125,30 @@ public class QueryIntelligenceService {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        String schema = parts.length > 1 ? parts[0] : prestoConfig.getSchema();
-        String table = parts.length > 1 ? parts[1] : parts[0];
+        // Si el usuario especifica el esquema (parts.length > 1), lo usa. Si no, busca dinámicamente en todos los esquemas cuál contiene la tabla.
+        String schema;
+        String table;
+        if (parts.length > 1) {
+            schema = parts[0];
+            table = parts[1];
+        } else {
+            table = parts[0];
+            schema = null;
+            List<String> schemas = prestoService.getSchemas();
+            for (String s : schemas) {
+                List<String> tables = prestoService.getTables(s);
+                for (String t : tables) {
+                    if (t.equalsIgnoreCase(table)) {
+                        schema = s;
+                        break;
+                    }
+                }
+                if (schema != null) break;
+            }
+            if (schema == null) {
+                return createErrorResponse("No se encontró el esquema para la tabla: " + table);
+            }
+        }
         List<Map<String, Object>> columns = prestoService.getTableColumns(schema, table);
         Map<String, Object> response = new HashMap<>();
         response.put("type", "table_description");
@@ -140,8 +165,30 @@ public class QueryIntelligenceService {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        String schema = parts.length > 1 ? parts[0] : prestoConfig.getSchema();
-        String table = parts.length > 1 ? parts[1] : parts[0];
+        // Si el usuario especifica el esquema (parts.length > 1), lo usa. Si no, busca dinámicamente en todos los esquemas cuál contiene la tabla.
+        String schema;
+        String table;
+        if (parts.length > 1) {
+            schema = parts[0];
+            table = parts[1];
+        } else {
+            table = parts[0];
+            schema = null;
+            List<String> schemas = prestoService.getSchemas();
+            for (String s : schemas) {
+                List<String> tables = prestoService.getTables(s);
+                for (String t : tables) {
+                    if (t.equalsIgnoreCase(table)) {
+                        schema = s;
+                        break;
+                    }
+                }
+                if (schema != null) break;
+            }
+            if (schema == null) {
+                return createErrorResponse("No se encontró el esquema para la tabla: " + table);
+            }
+        }
         List<Map<String, Object>> sampleData = prestoService.getSampleData(schema, table);
         Map<String, Object> response = new HashMap<>();
         response.put("type", "sample_data");
@@ -183,12 +230,14 @@ public class QueryIntelligenceService {
         if (entity == null) {
             return createErrorResponse("No se pudo identificar la entidad en la consulta.");
         }
+        // Buscar dinámicamente en todas las tablas de todos los esquemas
         List<String> schemas = prestoService.getSchemas();
         List<String> matchingTables = new ArrayList<>();
         for (String schema : schemas) {
             List<String> tables = prestoService.getTables(schema);
             for (String table : tables) {
-                if (table.toLowerCase().contains(entity)) {
+                String tableLower = table.toLowerCase();
+                if (tableLower.contains(entity) || tableLower.contains(entity + "s") || tableLower.contains(entity + "es")) {
                     matchingTables.add(schema + "." + table);
                 }
             }
@@ -197,7 +246,7 @@ public class QueryIntelligenceService {
             return createErrorResponse("No se encontró una tabla para la entidad: " + entity);
         }
         if (matchingTables.size() > 1) {
-            return createErrorResponse("Se encontraron varias tablas para la entidad: " + entity + ". Especifique la tabla.");
+            return createErrorResponse("Se encontraron varias tablas para la entidad: " + entity + ". Especifique la tabla. Coincidencias: " + matchingTables);
         }
         String table = matchingTables.get(0);
         List<Map<String, Object>> results = prestoService.executeQuery("SELECT * FROM " + table);
@@ -211,13 +260,24 @@ public class QueryIntelligenceService {
         return response;
     }
 
-    // Extrae la entidad de la consulta tipo "lista de X"
+    // Extrae la entidad de la consulta tipo "lista de X" usando tokenización
     private String extractEntityFromQuery(String query) {
+        String[] tokens = tokenizerService.tokenize(query);
+        // Busca el token después de "lista" o "lista de"
+        for (int i = 0; i < tokens.length; i++) {
+            if (tokens[i].equalsIgnoreCase("lista")) {
+                if (i + 2 < tokens.length && tokens[i + 1].equalsIgnoreCase("de")) {
+                    return tokens[i + 2].toLowerCase();
+                } else if (i + 1 < tokens.length) {
+                    return tokens[i + 1].toLowerCase();
+                }
+            }
+        }
+        // Fallback: patrón regex como antes
         Pattern p = Pattern.compile("lista de ([a-zA-Záéíóúñ]+)", Pattern.CASE_INSENSITIVE);
         Matcher m = p.matcher(query);
         if (m.find()) {
             String entity = m.group(1).toLowerCase();
-            // Normaliza plurales simples
             if (entity.endsWith("es")) entity = entity.substring(0, entity.length() - 2);
             else if (entity.endsWith("s")) entity = entity.substring(0, entity.length() - 1);
             return entity;
@@ -239,11 +299,12 @@ public class QueryIntelligenceService {
         return null;
     }
 
+    // Extrae la palabra clave de búsqueda usando tokenización
     private String extractSearchKeyword(String query) {
-        String[] words = query.toLowerCase().split("\\s+");
-        for (int i = 0; i < words.length - 1; i++) {
-            if (words[i].equals("find") || words[i].equals("search") || words[i].equals("for")) {
-                return words[i + 1].replaceAll("[^a-zA-Z0-9._]", "");
+        String[] tokens = tokenizerService.tokenize(query);
+        for (int i = 0; i < tokens.length - 1; i++) {
+            if (tokens[i].equalsIgnoreCase("find") || tokens[i].equalsIgnoreCase("search") || tokens[i].equalsIgnoreCase("for")) {
+                return tokens[i + 1].replaceAll("[^a-zA-Z0-9._]", "");
             }
         }
         return null;
@@ -267,5 +328,10 @@ public class QueryIntelligenceService {
                 "Lista de países",
                 "Lista de vendedores"
         );
+    }
+
+    // Ejemplo de uso de tokenización en la consulta
+    public String[] tokenizeQuery(String query) {
+        return tokenizerService.tokenize(query);
     }
 }
