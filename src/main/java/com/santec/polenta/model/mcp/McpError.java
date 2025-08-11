@@ -2,10 +2,14 @@ package com.santec.polenta.model.mcp;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Standard MCP error object following JSON-RPC error structure.
  */
+@Data
+@NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class McpError {
 
@@ -17,9 +21,6 @@ public class McpError {
 
     @JsonProperty("data")
     private Object data;
-
-    public McpError() {
-    }
 
     public McpError(int code, String message) {
         this.code = code;
@@ -38,29 +39,5 @@ public class McpError {
 
     public static McpError invalidRequest(String message) {
         return new McpError(-32600, message);
-    }
-
-    public int getCode() {
-        return code;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public Object getData() {
-        return data;
-    }
-
-    public void setData(Object data) {
-        this.data = data;
     }
 }

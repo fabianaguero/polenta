@@ -2,6 +2,7 @@ package com.santec.polenta.config;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import javax.sql.DataSource;
  */
 @Configuration
 @ConfigurationProperties(prefix = "presto")
+@Data
 public class PrestoConfig {
 
     /** JDBC URL including catalog and schema */
@@ -40,85 +42,6 @@ public class PrestoConfig {
     /** Delay in milliseconds before retrying a failed query */
     private long retryBackoffMs = 1000L;
 
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public void setUser(String user) {
-        this.user = user;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getCatalog() {
-        return catalog;
-    }
-
-    public void setCatalog(String catalog) {
-        this.catalog = catalog;
-    }
-
-    public String getSchema() {
-        return schema;
-    }
-
-    public void setSchema(String schema) {
-        this.schema = schema;
-    }
-
-    public int getMaxPoolSize() {
-        return maxPoolSize;
-    }
-
-    public void setMaxPoolSize(int maxPoolSize) {
-        this.maxPoolSize = maxPoolSize;
-    }
-
-    public long getConnectionTimeout() {
-        return connectionTimeout;
-    }
-
-    public void setConnectionTimeout(long connectionTimeout) {
-        this.connectionTimeout = connectionTimeout;
-    }
-
-    public long getQueryTimeout() {
-        return queryTimeout;
-    }
-
-    public void setQueryTimeout(long queryTimeout) {
-        this.queryTimeout = queryTimeout;
-    }
-
-    public int getMaxRetries() {
-        return maxRetries;
-    }
-
-    public void setMaxRetries(int maxRetries) {
-        this.maxRetries = maxRetries;
-    }
-
-    public long getRetryBackoffMs() {
-        return retryBackoffMs;
-    }
-
-    public void setRetryBackoffMs(long retryBackoffMs) {
-        this.retryBackoffMs = retryBackoffMs;
-    }
 
     @Bean
     public DataSource dataSource() {
@@ -134,4 +57,6 @@ public class PrestoConfig {
         config.setInitializationFailTimeout(-1);
         return new HikariDataSource(config);
     }
+
+
 }
