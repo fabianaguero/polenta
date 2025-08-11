@@ -31,9 +31,11 @@ public class PolentaMcpServerApplication {
                     logger.info("Conexión a Presto establecida correctamente al inicio de la aplicación");
                 } else {
                     logger.error("No se pudo establecer conexión a Presto al inicio de la aplicación");
+                    throw new IllegalStateException("No se pudo establecer conexión a Presto. Abortando arranque.");
                 }
             } catch (Exception e) {
                 logger.error("Error al inicializar la conexión a Presto: {}", e.getMessage(), e);
+                throw new IllegalStateException("Error crítico al inicializar la conexión a Presto. Abortando arranque.", e);
             }
         };
     }

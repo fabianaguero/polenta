@@ -1,5 +1,6 @@
 package com.santec.polenta.service;
 
+import com.santec.polenta.model.mcp.McpTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,102 +10,83 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * MCP Dispatcher Service - Handles JSON-RPC method dispatching for MCP protocol
- */
 @Service
 public class McpDispatcherService {
 
     private static final Logger logger = LoggerFactory.getLogger(McpDispatcherService.class);
 
-    @Autowired
-    private QueryIntelligenceService queryIntelligenceService;
+    private final QueryIntelligenceService queryIntelligenceService;
+    private final SessionManager sessionManager;
+    private final ToolRegistry toolRegistry;
 
-    @Value("${mcp.server.name}")
-    private String serverName;
+    private final String serverName;
+    private final String serverVersion;
+    private final String serverDescription;
 
-    @Value("${mcp.server.version}")
-    private String serverVersion;
+    public McpDispatcherService(
+            QueryIntelligenceService queryIntelligenceService,
+            SessionManager sessionManager,
+            ToolRegistry toolRegistry,
+            @Value("${mcp.server.name}") String serverName,
+            @Value("${mcp.server.version}") String serverVersion,
+            @Value("${mcp.server.description}") String serverDescription) {
+        this.queryIntelligenceService = queryIntelligenceService;
+        this.sessionManager = sessionManager;
+        this.toolRegistry = toolRegistry;
+        this.serverName = serverName;
+        this.serverVersion = serverVersion;
+        this.serverDescription = serverDescription;
+    }
 
-    @Value("${mcp.server.description}")
-    private String serverDescription;
-
-    // Track initialized sessions for ping requirement
-    private final Set<String> initializedSessions = ConcurrentHashMap.newKeySet();
-
-    /**
-     * Dispatch a JSON-RPC method call
-     */
     public Map<String, Object> dispatch(String method, Map<String, Object> params, String sessionId) {
         logger.info("Dispatching method: {} with params: {} for session: {}", method, params, sessionId);
-        
         try {
             switch (method) {
                 case "initialize":
-                    return handleInitialize(params, sessionId);
+                    return handleInitialize(sessionId);
                 case "ping":
-                    return handlePing(params, sessionId);
+                    return handlePing(sessionId);
                 case "tools/list":
-                    return handleToolsList(params);
+                    return handleToolsList();
                 case "tools/call":
                     return handleToolsCall(params);
                 default:
                     throw new IllegalArgumentException("Unknown method: " + method);
             }
-        } catch (IllegalArgumentException e) {
-            throw e; // Re-throw for -32601 (method not found) or -32602 (invalid params)
-        } catch (IllegalStateException e) {
-            throw e; // Re-throw for state errors like ping without initialize
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             logger.error("Internal error dispatching method {}: {}", method, e.getMessage(), e);
             throw new RuntimeException("Internal error: " + e.getMessage(), e);
         }
     }
 
-    private Map<String, Object> handleInitialize(Map<String, Object> params, String sessionId) {
+    private Map<String, Object> handleInitialize(String sessionId) {
         logger.info("Handling initialize for session: {}", sessionId);
-        
-        // Mark session as initialized
-        initializedSessions.add(sessionId);
-        
+        sessionManager.addSession(sessionId);
         Map<String, Object> result = new HashMap<>();
         result.put("protocolVersion", "2024-11-05");
         result.put("capabilities", getServerCapabilities());
         result.put("serverInfo", getServerInfo());
-        
         logger.info("Session {} initialized successfully", sessionId);
         return result;
     }
 
-    private Map<String, Object> handlePing(Map<String, Object> params, String sessionId) {
+    private Map<String, Object> handlePing(String sessionId) {
         logger.info("Handling ping for session: {}", sessionId);
-        
-        // Check if session is initialized
-        if (!initializedSessions.contains(sessionId)) {
+        if (!sessionManager.isSessionInitialized(sessionId)) {
             throw new IllegalStateException("Session not initialized. Call initialize first.");
         }
-        
         Map<String, Object> result = new HashMap<>();
         result.put("status", "pong");
         result.put("timestamp", System.currentTimeMillis());
         result.put("sessionId", sessionId);
-        
         return result;
     }
 
-    private Map<String, Object> handleToolsList(Map<String, Object> params) {
+    private Map<String, Object> handleToolsList() {
         logger.info("Handling tools/list");
-        
-        List<Map<String, Object>> tools = Arrays.asList(
-                createTool("query_data", "Execute natural language or SQL queries against the data lake", createQuerySchema()),
-                createTool("list_tables", "List all available tables in the data lake", createListTablesSchema()),
-                createTool("accessible_tables", "List tables the user has permission to query", createAccessibleTablesSchema()),
-                createTool("describe_table", "Get detailed information about a specific table structure", createDescribeTableSchema()),
-                createTool("sample_data", "Get sample data from a specific table", createSampleDataSchema()),
-                createTool("search_tables", "Search for tables containing specific keywords", createSearchTablesSchema()),
-                createTool("get_suggestions", "Get helpful query suggestions for users", createSuggestionsSchema())
-        );
-        
+        List<McpTool> tools = toolRegistry.getTools();
         Map<String, Object> result = new HashMap<>();
         result.put("tools", tools);
         return result;
@@ -112,72 +94,130 @@ public class McpDispatcherService {
 
     private Map<String, Object> handleToolsCall(Map<String, Object> params) {
         logger.info("Handling tools/call with params: {}", params);
-        
+
         if (params == null) {
             throw new IllegalArgumentException("Missing 'params' parameter");
         }
-        
         String toolName = (String) params.get("name");
-        Map<String, Object> arguments = (Map<String, Object>) params.get("arguments");
-        
         if (toolName == null) {
-            throw new IllegalArgumentException("Missing 'name' parameter in params");
+            throw new IllegalArgumentException("Missing 'name' parameter (tool name)");
         }
-        
+        Map<String, Object> arguments = (Map<String, Object>) params.get("arguments");
+        if (arguments == null) {
+            arguments = new HashMap<>();
+        }
+
+        // Buscar la tool
+        McpTool tool = toolRegistry.getTools().stream()
+                .filter(t -> toolName.equals(t.getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown tool: " + toolName));
+
+        // Validar argumentos según el input_schema
+        Map<String, Object> inputSchema = tool.getInputSchema();
+        List<String> required = inputSchema != null && inputSchema.get("required") instanceof List ?
+                (List<String>) inputSchema.get("required") : List.of();
+        Map<String, Object> properties = inputSchema != null && inputSchema.get("properties") instanceof Map ?
+                (Map<String, Object>) inputSchema.get("properties") : Map.of();
+        Map<String, Object> validationErrors = new HashMap<>();
+        // Validar requeridos
+        for (String req : required) {
+            if (!arguments.containsKey(req) || arguments.get(req) == null || arguments.get(req).toString().isEmpty()) {
+                validationErrors.put(req, "Missing required parameter");
+            }
+        }
+        // Validar tipos básicos (solo string, number, boolean)
+        for (String key : arguments.keySet()) {
+            if (properties.containsKey(key)) {
+                Object propSchema = properties.get(key);
+                String type = propSchema instanceof Map ? (String) ((Map<?, ?>) propSchema).get("type") : null;
+                Object value = arguments.get(key);
+                if (type != null && value != null) {
+                    boolean valid = switch (type) {
+                        case "string" -> value instanceof String;
+                        case "number" -> value instanceof Number;
+                        case "boolean" -> value instanceof Boolean;
+                        default -> true;
+                    };
+                    if (!valid) {
+                        validationErrors.put(key, "Invalid type: expected " + type);
+                    }
+                }
+            }
+        }
+        if (!validationErrors.isEmpty()) {
+            throw new IllegalArgumentException("Invalid params: " + validationErrors);
+        }
+
         return executeToolCall(toolName, arguments);
     }
 
     private Map<String, Object> executeToolCall(String toolName, Map<String, Object> arguments) {
-        switch (toolName) {
-            case "query_data":
-                if (arguments == null || arguments.get("query") == null) {
-                    throw new IllegalArgumentException("Parameter 'query' is required and cannot be null");
-                }
-                String query = (String) arguments.get("query");
-                return queryIntelligenceService.processNaturalQuery(query);
-            case "list_tables":
-                return queryIntelligenceService.processNaturalQuery("show all tables");
-            case "accessible_tables":
-                return queryIntelligenceService.processNaturalQuery("show accessible tables");
-            case "describe_table":
-                if (arguments == null || arguments.get("table_name") == null) {
-                    throw new IllegalArgumentException("Parameter 'table_name' is required and cannot be null");
-                }
-                String tableName = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("describe table " + tableName);
-            case "sample_data":
-                if (arguments == null || arguments.get("table_name") == null) {
-                    throw new IllegalArgumentException("Parameter 'table_name' is required and cannot be null");
-                }
-                String sampleTable = (String) arguments.get("table_name");
-                return queryIntelligenceService.processNaturalQuery("show sample data from " + sampleTable);
-            case "search_tables":
-                if (arguments == null || arguments.get("keyword") == null) {
-                    throw new IllegalArgumentException("Parameter 'keyword' is required and cannot be null");
-                }
-                String keyword = (String) arguments.get("keyword");
-                return queryIntelligenceService.processNaturalQuery("search for " + keyword);
-            case "get_suggestions":
-                Map<String, Object> suggestions = new HashMap<>();
-                suggestions.put("type", "suggestions");
-                suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
-                suggestions.put("message", "Helpful query suggestions");
-                return suggestions;
-            default:
-                throw new IllegalArgumentException("Unknown tool: " + toolName);
+        Map<String, Object> result;
+        try {
+            switch (toolName) {
+                case "query_data":
+                    if (arguments == null || arguments.get("query") == null) {
+                        throw new IllegalArgumentException("Parameter 'query' is required and cannot be null");
+                    }
+                    String query = (String) arguments.get("query");
+                    result = queryIntelligenceService.processNaturalQuery(query);
+                    break;
+                case "list_tables":
+                    result = queryIntelligenceService.processNaturalQuery("show all tables");
+                    break;
+                case "accessible_tables":
+                    result = queryIntelligenceService.processNaturalQuery("show accessible tables");
+                    break;
+                case "describe_table":
+                    if (arguments == null || arguments.get("table_name") == null) {
+                        throw new IllegalArgumentException("Parameter 'table_name' is required and cannot be null");
+                    }
+                    String tableName = (String) arguments.get("table_name");
+                    result = queryIntelligenceService.processNaturalQuery("describe table " + tableName);
+                    break;
+                case "sample_data":
+                    if (arguments == null || arguments.get("table_name") == null) {
+                        throw new IllegalArgumentException("Parameter 'table_name' is required and cannot be null");
+                    }
+                    String sampleTable = (String) arguments.get("table_name");
+                    result = queryIntelligenceService.processNaturalQuery("show sample data from " + sampleTable);
+                    break;
+                case "search_tables":
+                    if (arguments == null || arguments.get("keyword") == null) {
+                        throw new IllegalArgumentException("Parameter 'keyword' is required and cannot be null");
+                    }
+                    String keyword = (String) arguments.get("keyword");
+                    result = queryIntelligenceService.processNaturalQuery("search for " + keyword);
+                    break;
+                case "get_suggestions":
+                    Map<String, Object> suggestions = new HashMap<>();
+                    suggestions.put("type", "suggestions");
+                    suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
+                    suggestions.put("message", "Helpful query suggestions");
+                    result = suggestions;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown tool: " + toolName);
+            }
+            result.putIfAbsent("status", "success");
+            result.putIfAbsent("execution_id", UUID.randomUUID().toString());
+            result.putIfAbsent("timestamp", System.currentTimeMillis());
+            if (!result.containsKey("user_message") && result.containsKey("message")) {
+                result.put("user_message", result.get("message"));
+            }
+            // next_suggestions puede ser generado aquí si lo deseas
+        } catch (Exception e) {
+            result = new HashMap<>();
+            result.put("status", "error");
+            result.put("error_message", e.getMessage());
+            result.put("execution_id", UUID.randomUUID().toString());
+            result.put("timestamp", System.currentTimeMillis());
+            result.put("user_message", "Ocurrió un error al ejecutar la herramienta.");
         }
+        return result;
     }
 
-    public boolean isSessionInitialized(String sessionId) {
-        return initializedSessions.contains(sessionId);
-    }
-
-    public void clearSession(String sessionId) {
-        initializedSessions.remove(sessionId);
-    }
-
-    // --- Helper methods for server info and tool schemas ---
-    
     private Map<String, Object> getServerCapabilities() {
         Map<String, Object> capabilities = new HashMap<>();
         capabilities.put("tools", Map.of("listChanged", false));
@@ -198,6 +238,10 @@ public class McpDispatcherService {
         tool.put("name", name);
         tool.put("description", description);
         tool.put("input_schema", inputSchema);
+        tool.put("tool_metadata", Map.of(
+                "result_type", name,
+                "fields", List.of("status", "execution_id", "timestamp", "user_message")
+        ));
         return tool;
     }
 
@@ -210,7 +254,7 @@ public class McpDispatcherService {
                         "description", "Natural language query or SQL statement to execute"
                 )
         ));
-        schema.put("required", Arrays.asList("query"));
+        schema.put("required", List.of("query"));
         return schema;
     }
 
@@ -237,7 +281,7 @@ public class McpDispatcherService {
                         "description", "Name of the table to describe (format: schema.table or just table)"
                 )
         ));
-        schema.put("required", Arrays.asList("table_name"));
+        schema.put("required", List.of("table_name"));
         return schema;
     }
 
@@ -250,7 +294,7 @@ public class McpDispatcherService {
                         "description", "Name of the table to get sample data from"
                 )
         ));
-        schema.put("required", Arrays.asList("table_name"));
+        schema.put("required", List.of("table_name"));
         return schema;
     }
 
@@ -263,7 +307,7 @@ public class McpDispatcherService {
                         "description", "Keyword to search for in table names"
                 )
         ));
-        schema.put("required", Arrays.asList("keyword"));
+        schema.put("required", List.of("keyword"));
         return schema;
     }
 

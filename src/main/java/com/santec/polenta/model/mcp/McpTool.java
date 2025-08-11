@@ -23,6 +23,9 @@ public class McpTool {
     @JsonProperty("description")
     private String description;
 
-    @JsonProperty("inputSchema")
+    @JsonProperty("input_schema")
     private Map<String, Object> inputSchema;
+
+    @JsonProperty("tool_metadata")
+    private Map<String, Object> toolMetadata;
 }

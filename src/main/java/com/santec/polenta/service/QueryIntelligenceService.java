@@ -1,6 +1,5 @@
 package com.santec.polenta.service;
 
-import com.santec.polenta.config.PrestoConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,45 +7,30 @@ import org.springframework.stereotype.Service;
 
 import java.sql.SQLException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class QueryIntelligenceService {
 
     private static final Logger logger = LoggerFactory.getLogger(QueryIntelligenceService.class);
 
-    @Autowired
-    private PrestoService prestoService;
+    private final PrestoService prestoService;
+    private final TokenizerService tokenizerService;
+    private final QueryParser queryParser;
 
     @Autowired
-    private PrestoConfig prestoConfig;
-
-    @Autowired
-    private TokenizerService tokenizerService;
-
-    private static final Map<Pattern, String> QUERY_PATTERNS;
-    static {
-        Map<Pattern, String> patterns = new HashMap<>();
-        patterns.put(Pattern.compile("(?i).*show.*tables.*"), "SHOW_TABLES");
-        patterns.put(Pattern.compile("(?i).*list.*tables.*"), "SHOW_TABLES");
-        patterns.put(Pattern.compile("(?i).*what.*tables.*"), "SHOW_TABLES");
-        patterns.put(Pattern.compile("(?i).*accessible.*tables.*"), "ACCESSIBLE_TABLES");
-        patterns.put(Pattern.compile("(?i).*tables.*can.*access.*"), "ACCESSIBLE_TABLES");
-        patterns.put(Pattern.compile("(?i).*describe.*table.*"), "DESCRIBE_TABLE");
-        patterns.put(Pattern.compile("(?i).*columns.*in.*"), "DESCRIBE_TABLE");
-        patterns.put(Pattern.compile("(?i).*structure.*of.*"), "DESCRIBE_TABLE");
-        patterns.put(Pattern.compile("(?i).*sample.*data.*from.*"), "SAMPLE_DATA");
-        patterns.put(Pattern.compile("(?i).*show.*data.*from.*"), "SAMPLE_DATA");
-        patterns.put(Pattern.compile("(?i).*preview.*"), "SAMPLE_DATA");
-        patterns.put(Pattern.compile("(?i).*lista de [a-zA-Záéíóúñ]+.*"), "LIST_ENTITY");
-        QUERY_PATTERNS = Collections.unmodifiableMap(patterns);
+    public QueryIntelligenceService(
+            PrestoService prestoService,
+            TokenizerService tokenizerService,
+            QueryParser queryParser) {
+        this.prestoService = prestoService;
+        this.tokenizerService = tokenizerService;
+        this.queryParser = queryParser;
     }
 
     public Map<String, Object> processNaturalQuery(String query) {
         logger.info("Processing natural language query: {}", query);
         try {
-            String queryType = identifyQueryType(query);
+            String queryType = queryParser.identifyQueryType(query);
             switch (queryType) {
                 case "SHOW_TABLES":
                     return handleShowTables(query);
@@ -73,22 +57,6 @@ public class QueryIntelligenceService {
         }
     }
 
-    private String identifyQueryType(String query) {
-        for (Map.Entry<Pattern, String> entry : QUERY_PATTERNS.entrySet()) {
-            if (entry.getKey().matcher(query).matches()) {
-                return entry.getValue();
-            }
-        }
-        if (query.toLowerCase().contains("find") || query.toLowerCase().contains("search")) {
-            return "SEARCH_TABLES";
-        }
-        if (query.toLowerCase().trim().startsWith("select") ||
-                query.toLowerCase().trim().startsWith("show") ||
-                query.toLowerCase().trim().startsWith("describe")) {
-            return "DIRECT_SQL";
-        }
-        return "UNKNOWN";
-    }
 
     private Map<String, Object> handleShowTables(String query) throws SQLException {
         Map<String, Object> response = new HashMap<>();
@@ -120,12 +88,11 @@ public class QueryIntelligenceService {
     }
 
     private Map<String, Object> handleDescribeTable(String query) throws SQLException {
-        String tableName = extractTableName(query);
+        String tableName = queryParser.extractTableName(query, tokenizerService);
         if (tableName == null) {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        // Si el usuario especifica el esquema (parts.length > 1), lo usa. Si no, busca dinámicamente en todos los esquemas cuál contiene la tabla.
         String schema;
         String table;
         if (parts.length > 1) {
@@ -160,12 +127,11 @@ public class QueryIntelligenceService {
     }
 
     private Map<String, Object> handleSampleData(String query) throws SQLException {
-        String tableName = extractTableName(query);
+        String tableName = queryParser.extractTableName(query, tokenizerService);
         if (tableName == null) {
             return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
         }
         String[] parts = tableName.split("\\.");
-        // Si el usuario especifica el esquema (parts.length > 1), lo usa. Si no, busca dinámicamente en todos los esquemas cuál contiene la tabla.
         String schema;
         String table;
         if (parts.length > 1) {
@@ -200,7 +166,7 @@ public class QueryIntelligenceService {
     }
 
     private Map<String, Object> handleSearchTables(String query) throws SQLException {
-        String keyword = extractSearchKeyword(query);
+        String keyword = queryParser.extractSearchKeyword(query, tokenizerService);
         if (keyword == null) {
             return createErrorResponse("No se pudo identificar la palabra clave de búsqueda en la consulta.");
         }
@@ -224,13 +190,11 @@ public class QueryIntelligenceService {
         return response;
     }
 
-    // --- NUEVO MÉTODO PARA CONSULTAS DE ENTIDAD GENÉRICA ---
     private Map<String, Object> handleListEntity(String query) throws SQLException {
-        String entity = extractEntityFromQuery(query);
+        String entity = queryParser.extractEntityFromQuery(query, tokenizerService);
         if (entity == null) {
             return createErrorResponse("No se pudo identificar la entidad en la consulta.");
         }
-        // Buscar dinámicamente en todas las tablas de todos los esquemas
         List<String> schemas = prestoService.getSchemas();
         List<String> matchingTables = new ArrayList<>();
         for (String schema : schemas) {
@@ -260,60 +224,15 @@ public class QueryIntelligenceService {
         return response;
     }
 
-    // Extrae la entidad de la consulta tipo "lista de X" usando tokenización
-    private String extractEntityFromQuery(String query) {
-        String[] tokens = tokenizerService.tokenize(query);
-        // Busca el token después de "lista" o "lista de"
-        for (int i = 0; i < tokens.length; i++) {
-            if (tokens[i].equalsIgnoreCase("lista")) {
-                if (i + 2 < tokens.length && tokens[i + 1].equalsIgnoreCase("de")) {
-                    return tokens[i + 2].toLowerCase();
-                } else if (i + 1 < tokens.length) {
-                    return tokens[i + 1].toLowerCase();
-                }
-            }
-        }
-        // Fallback: patrón regex como antes
-        Pattern p = Pattern.compile("lista de ([a-zA-Záéíóúñ]+)", Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(query);
-        if (m.find()) {
-            String entity = m.group(1).toLowerCase();
-            if (entity.endsWith("es")) entity = entity.substring(0, entity.length() - 2);
-            else if (entity.endsWith("s")) entity = entity.substring(0, entity.length() - 1);
-            return entity;
-        }
-        return null;
-    }
-
-    private String extractTableName(String query) {
-        String[] words = query.toLowerCase().split("\\s+");
-        for (int i = 0; i < words.length - 1; i++) {
-            if (words[i].equals("from") || words[i].equals("table") || words[i].equals("of")) {
-                return words[i + 1].replaceAll("[^a-zA-Z0-9._]", "");
-            }
-        }
-        String lastWord = words[words.length - 1].replaceAll("[^a-zA-Z0-9._]", "");
-        if (lastWord.length() > 0) {
-            return lastWord;
-        }
-        return null;
-    }
-
-    // Extrae la palabra clave de búsqueda usando tokenización
-    private String extractSearchKeyword(String query) {
-        String[] tokens = tokenizerService.tokenize(query);
-        for (int i = 0; i < tokens.length - 1; i++) {
-            if (tokens[i].equalsIgnoreCase("find") || tokens[i].equalsIgnoreCase("search") || tokens[i].equalsIgnoreCase("for")) {
-                return tokens[i + 1].replaceAll("[^a-zA-Z0-9._]", "");
-            }
-        }
-        return null;
-    }
 
     private Map<String, Object> createErrorResponse(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("type", "error");
         response.put("message", message);
+        response.put("status", "error");
+        response.put("execution_id", UUID.randomUUID().toString());
+        response.put("timestamp", System.currentTimeMillis());
+        response.put("user_message", message);
         return response;
     }
 
@@ -328,10 +247,5 @@ public class QueryIntelligenceService {
                 "Lista de países",
                 "Lista de vendedores"
         );
-    }
-
-    // Ejemplo de uso de tokenización en la consulta
-    public String[] tokenizeQuery(String query) {
-        return tokenizerService.tokenize(query);
     }
 }

@@ -130,6 +130,34 @@ public class McpController {
         }
     }
 
+    // Nuevo endpoint para documentación de tools
+    @GetMapping("/tools/docs")
+    @Operation(
+        summary = "[HELPER] Documentación de todas las herramientas MCP",
+        description = "Devuelve la documentación y schemas de todas las herramientas registradas en el servidor."
+    )
+    public ResponseEntity<Map<String, Object>> toolsDocs() {
+        logger.info("Helper endpoint /mcp/tools/docs called");
+        try {
+            Map<String, Object> docs = new HashMap<>();
+            docs.put("tools", dispatcherService.dispatch("tools/list", Map.of(), null).get("tools"));
+            return ResponseEntity.ok(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "result", docs
+            ));
+        } catch (Exception e) {
+            logger.error("Error in helper tools/docs endpoint: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "error", Map.of(
+                    "code", -32603,
+                    "message", "Internal error: " + e.getMessage()
+                )
+            ));
+        }
+    }
 
     // --- Utility methods for helper endpoints ---
 

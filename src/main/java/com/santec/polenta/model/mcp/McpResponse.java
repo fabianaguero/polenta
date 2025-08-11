@@ -24,6 +24,25 @@ public class McpResponse<T> {
     @JsonProperty("error")
     private McpError error;
 
+    // Nuevos campos para enriquecer la respuesta
+    @JsonProperty("status")
+    private String status;
+
+    @JsonProperty("result_type")
+    private String resultType;
+
+    @JsonProperty("execution_id")
+    private String executionId;
+
+    @JsonProperty("timestamp")
+    private Long timestamp;
+
+    @JsonProperty("user_message")
+    private String userMessage;
+
+    @JsonProperty("next_suggestions")
+    private Object nextSuggestions;
+
     public McpResponse(String id, T result) {
         this.id = id;
         this.result = result;
@@ -34,12 +53,19 @@ public class McpResponse<T> {
         this.error = error;
     }
 
-    // Static factory methods
     public static <T> McpResponse<T> success(String id, T result) {
-        return new McpResponse<>(id, result);
+        McpResponse<T> response = new McpResponse<>(id, result);
+        response.setStatus("success");
+        response.setExecutionId(java.util.UUID.randomUUID().toString());
+        response.setTimestamp(System.currentTimeMillis());
+        return response;
     }
 
     public static <T> McpResponse<T> error(String id, McpError error) {
-        return new McpResponse<>(id, error);
+        McpResponse<T> response = new McpResponse<>(id, error);
+        response.setStatus("error");
+        response.setExecutionId(java.util.UUID.randomUUID().toString());
+        response.setTimestamp(System.currentTimeMillis());
+        return response;
     }
 }
