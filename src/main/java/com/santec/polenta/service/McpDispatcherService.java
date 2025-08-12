@@ -18,6 +18,7 @@ public class McpDispatcherService {
     private final QueryIntelligenceService queryIntelligenceService;
     private final SessionManager sessionManager;
     private final ToolRegistry toolRegistry;
+    private final MetadataCacheTool metadataCacheTool;
 
     private final String serverName;
     private final String serverVersion;
@@ -27,12 +28,14 @@ public class McpDispatcherService {
             QueryIntelligenceService queryIntelligenceService,
             SessionManager sessionManager,
             ToolRegistry toolRegistry,
+            MetadataCacheTool metadataCacheTool,
             @Value("${mcp.server.name}") String serverName,
             @Value("${mcp.server.version}") String serverVersion,
             @Value("${mcp.server.description}") String serverDescription) {
         this.queryIntelligenceService = queryIntelligenceService;
         this.sessionManager = sessionManager;
         this.toolRegistry = toolRegistry;
+        this.metadataCacheTool = metadataCacheTool;
         this.serverName = serverName;
         this.serverVersion = serverVersion;
         this.serverDescription = serverDescription;
@@ -197,6 +200,36 @@ public class McpDispatcherService {
                     suggestions.put("message", "Helpful query suggestions");
                     result = suggestions;
                     break;
+                case "schemas":
+                    Set<String> schemas = metadataCacheTool.schemas();
+                    result = new HashMap<>();
+                    result.put("schemas", schemas);
+                    result.put("message", "Lista de esquemas disponibles");
+                    break;
+                case "tables":
+                    if (arguments == null || arguments.get("schema") == null) {
+                        throw new IllegalArgumentException("Parameter 'schema' is required and cannot be null");
+                    }
+                    String schema = (String) arguments.get("schema");
+                    Set<String> tables = metadataCacheTool.tables(schema);
+                    result = new HashMap<>();
+                    result.put("schema", schema);
+                    result.put("tables", tables);
+                    result.put("message", "Lista de tablas del esquema " + schema);
+                    break;
+                case "columns":
+                    if (arguments == null || arguments.get("schema") == null || arguments.get("table") == null) {
+                        throw new IllegalArgumentException("Parameters 'schema' and 'table' are required and cannot be null");
+                    }
+                    String schemaCol = (String) arguments.get("schema");
+                    String tableCol = (String) arguments.get("table");
+                    List<String> columns = metadataCacheTool.columns(schemaCol, tableCol);
+                    result = new HashMap<>();
+                    result.put("schema", schemaCol);
+                    result.put("table", tableCol);
+                    result.put("columns", columns);
+                    result.put("message", "Lista de columnas de " + schemaCol + "." + tableCol);
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown tool: " + toolName);
             }
@@ -318,3 +351,4 @@ public class McpDispatcherService {
         return schema;
     }
 }
+

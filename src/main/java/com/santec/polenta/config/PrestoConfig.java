@@ -51,7 +51,8 @@ public class PrestoConfig {
         if (password != null && !password.isEmpty()) {
             config.setPassword(password);
         }
-        config.setDriverClassName("io.trino.jdbc.TrinoDriver");
+        config.setDriverClassName("io.prestosql.jdbc.PrestoDriver");
+        //config.setDriverClassName("io.trino.jdbc.TrinoDriver");
         config.setMaximumPoolSize(maxPoolSize);
         config.setConnectionTimeout(connectionTimeout);
         config.setInitializationFailTimeout(-1);

@@ -10,33 +10,41 @@ public class QueryParser {
     private static final Map<Pattern, String> QUERY_PATTERNS;
     static {
         Map<Pattern, String> patterns = new HashMap<>();
+        // Inglés
         patterns.put(Pattern.compile("(?i).*show.*tables.*"), "SHOW_TABLES");
         patterns.put(Pattern.compile("(?i).*list.*tables.*"), "SHOW_TABLES");
         patterns.put(Pattern.compile("(?i).*what.*tables.*"), "SHOW_TABLES");
         patterns.put(Pattern.compile("(?i).*accessible.*tables.*"), "ACCESSIBLE_TABLES");
         patterns.put(Pattern.compile("(?i).*tables.*can.*access.*"), "ACCESSIBLE_TABLES");
-        patterns.put(Pattern.compile("(?i).*describe.*table.*"), "DESCRIBE_TABLE");
+        patterns.put(Pattern.compile("(?i).*describe\\s+table\\s+\\w+.*"), "DESCRIBE_TABLE");
         patterns.put(Pattern.compile("(?i).*columns.*in.*"), "DESCRIBE_TABLE");
         patterns.put(Pattern.compile("(?i).*structure.*of.*"), "DESCRIBE_TABLE");
-        patterns.put(Pattern.compile("(?i).*sample.*data.*from.*"), "SAMPLE_DATA");
+        patterns.put(Pattern.compile("(?i).*sample\\s+data\\s+from\\s+\\w+.*"), "SAMPLE_DATA");
         patterns.put(Pattern.compile("(?i).*show.*data.*from.*"), "SAMPLE_DATA");
         patterns.put(Pattern.compile("(?i).*preview.*"), "SAMPLE_DATA");
-        patterns.put(Pattern.compile("(?i).*lista de [a-zA-Záéíóúñ]+.*"), "LIST_ENTITY");
+        patterns.put(Pattern.compile("(?i).*find\\s+tables\\s+containing\\s+\\w+.*"), "SEARCH_TABLES");
+        // Español
+        patterns.put(Pattern.compile("(?i).*(todas|lista)\\s+las\\s+\\w+\\s+del\\s+esquema\\s+\\w+.*"), "LIST_ENTITY");
+        patterns.put(Pattern.compile("(?i).*lista\\s+de\\s+\\w+.*"), "LIST_ENTITY");
+        patterns.put(Pattern.compile("(?i).*buscar\\s+\\w+\\s+en\\s+el\\s+esquema\\s+\\w+.*"), "SEARCH_ENTITY");
+        patterns.put(Pattern.compile("(?i).*datos\\s+de\\s+la\\s+tabla\\s+\\w+.*"), "TABLE_DATA");
+        patterns.put(Pattern.compile("(?i).*contar\\s+registros\\s+en\\s+la\\s+tabla\\s+\\w+.*"), "COUNT_RECORDS");
+        patterns.put(Pattern.compile("(?i).*columnas\\s+de\\s+la\\s+tabla\\s+\\w+.*"), "LIST_COLUMNS");
+        patterns.put(Pattern.compile("(?i).*seleccionar\\s+.*\\s+de\\s+la\\s+tabla\\s+\\w+\\s+donde\\s+.*"), "FILTERED_QUERY");
         QUERY_PATTERNS = java.util.Collections.unmodifiableMap(patterns);
     }
 
     public String identifyQueryType(String query) {
+        String q = query.toLowerCase().trim();
         for (Map.Entry<Pattern, String> entry : QUERY_PATTERNS.entrySet()) {
             if (entry.getKey().matcher(query).matches()) {
                 return entry.getValue();
             }
         }
-        if (query.toLowerCase().contains("find") || query.toLowerCase().contains("search")) {
+        if (q.contains("find") || q.contains("search")) {
             return "SEARCH_TABLES";
         }
-        if (query.toLowerCase().trim().startsWith("select") ||
-                query.toLowerCase().trim().startsWith("show") ||
-                query.toLowerCase().trim().startsWith("describe")) {
+        if (q.startsWith("select") || q.startsWith("show") || q.startsWith("describe")) {
             return "DIRECT_SQL";
         }
         return "UNKNOWN";

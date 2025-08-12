@@ -292,6 +292,107 @@ public class ToolRegistry {
                     "last_updated", "2025-08-11",
                     "description_long", "Devuelve una lista de sugerencias de consultas útiles para usuarios nuevos o que buscan inspiración. Incluye ejemplos de preguntas y sentencias SQL."
                 )
+            ),
+            new McpTool(
+                "schemas",
+                "Devuelve la lista de esquemas disponibles en el data lake.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(),
+                    "required", List.of(),
+                    "examples", List.of(Map.of()),
+                    "description_long", "No requiere parámetros. Devuelve un listado de todos los esquemas disponibles."
+                ),
+                Map.of(
+                    "result_type", "schemas_list",
+                    "fields", List.of("schemas"),
+                    "examples", List.of(
+                        Map.of("schemas", List.of("default", "finanzas", "ventas")),
+                        Map.of("schemas", List.of("tiny", "tpch"))
+                    ),
+                    "usage_examples", List.of(
+                        "Listar esquemas",
+                        "¿Qué esquemas hay?",
+                        "Mostrar todos los esquemas"
+                    ),
+                    "tags", List.of("metadata", "esquemas", "exploración"),
+                    "version", "1.0",
+                    "author", "Equipo Data Lake",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Devuelve un listado de todos los esquemas disponibles en el data lake."
+                )
+            ),
+            new McpTool(
+                "tables",
+                "Devuelve la lista de tablas de un esquema específico.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "schema", Map.of(
+                            "type", "string",
+                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas', 'tiny'"
+                        )
+                    ),
+                    "required", List.of("schema"),
+                    "examples", List.of(Map.of("schema", "default")),
+                    "description_long", "El parámetro 'schema' es obligatorio. Devuelve todas las tablas del esquema indicado."
+                ),
+                Map.of(
+                    "result_type", "tables_list",
+                    "fields", List.of("schema", "tables"),
+                    "examples", List.of(
+                        Map.of("schema", "default", "tables", List.of("clientes", "ventas")),
+                        Map.of("schema", "tiny", "tables", List.of("nation", "region"))
+                    ),
+                    "usage_examples", List.of(
+                        "Listar tablas del esquema default",
+                        "¿Qué tablas hay en finanzas?",
+                        "Mostrar tablas de tiny"
+                    ),
+                    "tags", List.of("metadata", "tablas", "exploración", "esquemas"),
+                    "version", "1.0",
+                    "author", "Equipo Data Lake",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Devuelve todas las tablas del esquema indicado."
+                )
+            ),
+            new McpTool(
+                "columns",
+                "Devuelve la lista de columnas de una tabla específica.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "schema", Map.of(
+                            "type", "string",
+                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas', 'tiny'"
+                        ),
+                        "table", Map.of(
+                            "type", "string",
+                            "description", "Nombre de la tabla. Ejemplo: 'clientes', 'nation'"
+                        )
+                    ),
+                    "required", List.of("schema", "table"),
+                    "examples", List.of(Map.of("schema", "default", "table", "clientes")),
+                    "description_long", "Los parámetros 'schema' y 'table' son obligatorios. Devuelve todas las columnas de la tabla indicada."
+                ),
+                Map.of(
+                    "result_type", "columns_list",
+                    "fields", List.of("schema", "table", "columns"),
+                    "examples", List.of(
+                        Map.of("schema", "default", "table", "clientes", "columns", List.of("cliente_id", "nombre", "fecha_alta")),
+                        Map.of("schema", "tiny", "table", "nation", "columns", List.of("nationkey", "name", "regionkey"))
+                    ),
+                    "usage_examples", List.of(
+                        "Listar columnas de clientes en default",
+                        "¿Qué columnas tiene la tabla nation en tiny?",
+                        "Mostrar columnas de ventas en finanzas"
+                    ),
+                    "tags", List.of("metadata", "columnas", "exploración", "tablas"),
+                    "version", "1.0",
+                    "author", "Equipo Data Lake",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Devuelve todas las columnas de la tabla indicada."
+                )
             )
         );
     }
