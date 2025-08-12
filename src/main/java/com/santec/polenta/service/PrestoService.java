@@ -18,18 +18,14 @@ public class PrestoService {
     private PrestoConfig prestoConfig;
 
     public List<Map<String, Object>> executeQuery(String sql) throws SQLException {
-        logger.info("Ejecutando consulta: {}", sql);
+        logger.info("Executing query: {}", sql);
         List<Map<String, Object>> results = new ArrayList<>();
-
         try (Connection connection = getConnection();
              Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(sql)) {
-
             ResultSetMetaData metaData = resultSet.getMetaData();
             int columnCount = metaData.getColumnCount();
-
-            logger.debug("Columnas detectadas: {}", columnCount);
-
+            logger.debug("Columns detected: {}", columnCount);
             while (resultSet.next()) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 for (int i = 1; i <= columnCount; i++) {
@@ -39,47 +35,53 @@ public class PrestoService {
                 }
                 results.add(row);
             }
-            logger.info("Consulta ejecutada correctamente, filas devueltas: {}", results.size());
+            logger.info("Query executed successfully, rows returned: {}", results.size());
         } catch (SQLException e) {
-            logger.error("Error ejecutando consulta: {} | SQL: {}", e.getMessage(), sql, e);
+            logger.error("Error executing query: {} | SQL: {}", e.getMessage(), sql, e);
             throw e;
         }
-
         return results;
     }
 
     public List<String> getSchemas() throws SQLException {
-        logger.debug("Obteniendo esquemas disponibles...");
-        String sql = "SHOW SCHEMAS";
+        logger.debug("Getting available schemas...");
+        String catalog = prestoConfig.getCatalog();
+        String sql;
+        if (catalog != null && !catalog.isEmpty()) {
+            sql = String.format("SHOW SCHEMAS FROM %s", catalog);
+        } else {
+            sql = "SHOW SCHEMAS";
+        }
         List<Map<String, Object>> results = executeQuery(sql);
         List<String> schemas = results.stream()
-                .map(row -> (String) row.get("Schema"))
+                .map(row -> (String) row.getOrDefault("Schema", row.getOrDefault("schema_name", null)))
+                .filter(Objects::nonNull)
                 .toList();
-        logger.debug("Esquemas encontrados: {}", schemas);
+        logger.debug("Schemas found: {}", schemas);
         return schemas;
     }
 
     public List<String> getTables(String schema) throws SQLException {
-        logger.debug("Obteniendo tablas del esquema: {}", schema);
+        logger.debug("Getting tables from schema: {}", schema);
         String sql = String.format("SHOW TABLES FROM %s", schema);
         List<Map<String, Object>> results = executeQuery(sql);
         List<String> tables = results.stream()
                 .map(row -> (String) row.get("Table"))
                 .toList();
-        logger.debug("Tablas encontradas en {}: {}", schema, tables);
+        logger.debug("Tables found in {}: {}", schema, tables);
         return tables;
     }
 
     public List<Map<String, Object>> getTableColumns(String schema, String table) throws SQLException {
-        logger.debug("Obteniendo columnas de la tabla: {}.{}", schema, table);
+        logger.debug("Getting columns from table: {}.{}", schema, table);
         String sql = String.format("DESCRIBE %s.%s", schema, table);
         List<Map<String, Object>> columns = executeQuery(sql);
-        logger.debug("Columnas de {}.{}: {}", schema, table, columns);
+        logger.debug("Columns of {}.{}: {}", schema, table, columns);
         return columns;
     }
 
     public List<String> searchTables(String keyword) throws SQLException {
-        logger.debug("Buscando tablas que contengan la palabra clave: {}", keyword);
+        logger.debug("Searching tables containing keyword: {}", keyword);
         String sql = String.format(
                 "SELECT table_schema, table_name FROM information_schema.tables WHERE LOWER(table_name) LIKE '%%%s%%'",
                 keyword.toLowerCase());
@@ -87,20 +89,20 @@ public class PrestoService {
         List<String> matchingTables = results.stream()
                 .map(row -> (String) row.get("table_schema") + "." + (String) row.get("table_name"))
                 .toList();
-        logger.debug("Tablas encontradas con la palabra clave '{}': {}", keyword, matchingTables);
+        logger.debug("Tables found with keyword '{}': {}", keyword, matchingTables);
         return matchingTables;
     }
 
     public List<Map<String, Object>> getSampleData(String schema, String table) throws SQLException {
-        logger.debug("Obteniendo datos de muestra de la tabla: {}.{}", schema, table);
+        logger.debug("Getting sample data from table: {}.{}", schema, table);
         String sql = String.format("SELECT * FROM %s.%s LIMIT 10", schema, table);
         List<Map<String, Object>> data = executeQuery(sql);
-        logger.debug("Datos de muestra de {}.{}: {}", schema, table, data);
+        logger.debug("Sample data from {}.{}: {}", schema, table, data);
         return data;
     }
 
     private Connection getConnection() throws SQLException {
-        logger.debug("Creando conexión JDBC a Presto: {}", prestoConfig.getUrl());
+        logger.debug("Creating JDBC connection to Presto: {}", prestoConfig.getUrl());
         Properties properties = new Properties();
         properties.setProperty("user", prestoConfig.getUser());
         if (prestoConfig.getPassword() != null && !prestoConfig.getPassword().isEmpty()) {
@@ -108,7 +110,7 @@ public class PrestoService {
         }
         if (prestoConfig.getQueryTimeout() > 0) {
             // properties.setProperty("socketTimeout", String.valueOf(prestoConfig.getQueryTimeout()));
-            // Elimina socketTimeout: Trino no lo reconoce
+            // Remove socketTimeout: Trino does not recognize it
         }
         int previousLoginTimeout = DriverManager.getLoginTimeout();
         //if (prestoConfig.getConnectionTimeout() > 0) {
@@ -118,7 +120,7 @@ public class PrestoService {
         //}
         try {
             Connection conn = DriverManager.getConnection(prestoConfig.getUrl(), properties);
-            logger.debug("Conexión establecida correctamente");
+            logger.debug("Connection established successfully");
             return conn;
         } finally {
             // if (prestoConfig.getConnectionTimeout() > 0) {
@@ -128,36 +130,35 @@ public class PrestoService {
     }
 
     public boolean testConnection() {
-        logger.debug("Probando conexión a la base de datos...");
+        logger.debug("Testing database connection...");
         try (Connection connection = getConnection()) {
             boolean valid = connection.isValid(5);
-            logger.debug("Resultado de la prueba de conexión: {}", valid);
+            logger.debug("Connection test result: {}", valid);
             return valid;
         } catch (SQLException e) {
-            logger.error("Fallo en la prueba de conexión: {}", e.getMessage(), e);
+            logger.error("Connection test failed: {}", e.getMessage(), e);
             return false;
         }
     }
 
     public boolean canAccessTable(String schema, String table) {
-        logger.debug("Verificando acceso a la tabla: {}.{}", schema, table);
+        logger.debug("Checking access to table: {}.{}", schema, table);
         try {
             String sql = String.format("SELECT 1 FROM %s.%s LIMIT 1", schema, table);
             executeQuery(sql);
-            logger.debug("Acceso permitido a la tabla: {}.{}", schema, table);
+            logger.debug("Access allowed to table: {}.{}", schema, table);
             return true;
         } catch (SQLException e) {
-            logger.debug("Sin acceso a la tabla {}.{}: {}", schema, table, e.getMessage());
+            logger.debug("No access to table {}.{}: {}", schema, table, e.getMessage());
             return false;
         }
     }
 
     public List<String> getAccessibleTables() throws SQLException {
-        logger.debug("Obteniendo tablas accesibles para el usuario...");
+        logger.debug("Getting accessible tables for the user...");
         List<String> accessibleTables = new ArrayList<>();
         String sql = "SELECT table_schema, table_name FROM information_schema.tables";
         List<Map<String, Object>> results = executeQuery(sql);
-
         for (Map<String, Object> row : results) {
             String schema = (String) row.get("table_schema");
             String table = (String) row.get("table_name");
@@ -165,8 +166,7 @@ public class PrestoService {
                 accessibleTables.add(schema + "." + table);
             }
         }
-
-        logger.debug("Tablas accesibles: {}", accessibleTables);
+        logger.debug("Accessible tables: {}", accessibleTables);
         return accessibleTables;
     }
 }

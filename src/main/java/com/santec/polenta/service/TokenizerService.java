@@ -18,15 +18,14 @@ public class TokenizerService {
             TokenizerModel model = new TokenizerModel(modelIn);
             tokenizer = new TokenizerME(model);
         } catch (IOException e) {
-            throw new RuntimeException("No se pudo cargar el modelo de tokenización", e);
+            throw new RuntimeException("Could not load the tokenization model", e);
         }
     }
 
     public String[] tokenize(String text) {
         if (tokenizer == null) {
-            throw new IllegalStateException("El modelo de tokenización no está inicializado");
+            throw new IllegalStateException("The tokenization model is not initialized");
         }
         return tokenizer.tokenize(text);
     }
 }
-

@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Se encarga de la gestión de sesiones inicializadas.
+ * Handles the management of initialized sessions.
  */
 @Component
 public class SessionManager {
@@ -23,4 +23,3 @@ public class SessionManager {
         initializedSessions.remove(sessionId);
     }
 }
-

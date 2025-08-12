@@ -31,86 +31,86 @@ public class QueryIntelligenceService {
     }
 
     public Map<String, Object> processNaturalQuery(String query) {
-        logger.info("Entrando a processNaturalQuery con query: {}", query);
+        logger.info("Entering processNaturalQuery with query: {}", query);
         try {
             String queryType = queryParser.identifyQueryType(query);
-            logger.debug("Tipo de consulta identificado: {}", queryType);
+            logger.debug("Identified query type: {}", queryType);
             switch (queryType) {
                 case "SHOW_TABLES":
-                    logger.info("Ejecutando handleShowTables");
+                    logger.info("Executing handleShowTables");
                     return handleShowTables(query);
                 case "ACCESSIBLE_TABLES":
-                    logger.info("Ejecutando handleAccessibleTables");
+                    logger.info("Executing handleAccessibleTables");
                     return handleAccessibleTables(query);
                 case "DESCRIBE_TABLE":
-                    logger.info("Ejecutando handleDescribeTable");
+                    logger.info("Executing handleDescribeTable");
                     return handleDescribeTable(query);
                 case "SAMPLE_DATA":
-                    logger.info("Ejecutando handleSampleData");
+                    logger.info("Executing handleSampleData");
                     return handleSampleData(query);
                 case "SEARCH_TABLES":
-                    logger.info("Ejecutando handleSearchTables");
+                    logger.info("Executing handleSearchTables");
                     return handleSearchTables(query);
                 case "LIST_ENTITY":
-                    logger.info("Ejecutando handleListEntity");
+                    logger.info("Executing handleListEntity");
                     return handleListEntity(query);
                 case "DIRECT_SQL":
-                    logger.info("Ejecutando handleDirectSQL");
+                    logger.info("Executing handleDirectSQL");
                     return handleDirectSQL(query);
                 case "UNKNOWN":
-                    logger.warn("Tipo de consulta UNKNOWN");
-                    return createErrorResponse("No se pudo determinar el tipo de consulta. Por favor, refine su solicitud.");
+                    logger.warn("Query type UNKNOWN");
+                    return createErrorResponse("Could not determine the query type. Please refine your request.");
                 default:
-                    logger.info("Ejecutando handleDirectSQL por default");
+                    logger.info("Executing handleDirectSQL by default");
                     return handleDirectSQL(query);
             }
         } catch (Exception e) {
             logger.error("Error processing query: {}", e.getMessage(), e);
-            return createErrorResponse("Error procesando la consulta: " + e.getMessage());
+            return createErrorResponse("Error processing the query: " + e.getMessage());
         }
     }
 
     private Map<String, Object> handleShowTables(String query) throws SQLException {
-        logger.info("Entrando a handleShowTables con query: {}", query);
+        logger.info("Entering handleShowTables with query: {}", query);
         Map<String, Object> response = new HashMap<>();
         List<String> schemas = prestoService.getSchemas();
-        logger.debug("Esquemas obtenidos: {}", schemas);
+        logger.debug("Schemas obtained: {}", schemas);
         Map<String, List<String>> schemaTablesMap = new HashMap<>();
         for (String schema : schemas) {
             try {
                 List<String> tables = prestoService.getTables(schema);
-                logger.debug("Tablas en esquema {}: {}", schema, tables);
+                logger.debug("Tables in schema {}: {}", schema, tables);
                 if (!tables.isEmpty()) {
                     schemaTablesMap.put(schema, tables);
                 }
             } catch (SQLException e) {
-                logger.warn("No se pudo acceder al esquema {}: {}", schema, e.getMessage());
+                logger.warn("Could not access schema {}: {}", schema, e.getMessage());
             }
         }
         response.put("type", "table_list");
         response.put("schemas", schemaTablesMap);
-        response.put("message", "Tablas disponibles organizadas por esquema");
+        response.put("message", "Available tables organized by schema");
         return response;
     }
 
     private Map<String, Object> handleAccessibleTables(String query) throws SQLException {
-        logger.info("Entrando a handleAccessibleTables con query: {}", query);
+        logger.info("Entering handleAccessibleTables with query: {}", query);
         Map<String, Object> response = new HashMap<>();
         List<String> accessible = prestoService.getAccessibleTables();
-        logger.debug("Tablas accesibles: {}", accessible);
+        logger.debug("Accessible tables: {}", accessible);
         response.put("type", "accessible_table_list");
         response.put("tables", accessible);
-        response.put("message", "Tablas accesibles para consulta");
+        response.put("message", "Accessible tables for querying");
         return response;
     }
 
     private Map<String, Object> handleDescribeTable(String query) throws SQLException {
-        logger.info("Entrando a handleDescribeTable con query: {}", query);
+        logger.info("Entering handleDescribeTable with query: {}", query);
         String tableName = queryParser.extractTableName(query, tokenizerService);
-        logger.debug("Nombre de tabla extraído: {}", tableName);
+        logger.debug("Table name extracted: {}", tableName);
         if (tableName == null) {
-            logger.warn("No se pudo identificar el nombre de la tabla en la consulta");
-            return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
+            logger.warn("Could not identify the table name in the query");
+            return createErrorResponse("Could not identify the table name in the query. Please specify a table.");
         }
         String[] parts = tableName.split("\\.");
         String schema;
@@ -122,7 +122,7 @@ public class QueryIntelligenceService {
             table = parts[0];
             schema = null;
             List<String> schemas = prestoService.getSchemas();
-            logger.debug("Buscando esquema para la tabla: {}", table);
+            logger.debug("Searching for schema for table: {}", table);
             for (String s : schemas) {
                 List<String> tables = prestoService.getTables(s);
                 for (String t : tables) {
@@ -134,28 +134,42 @@ public class QueryIntelligenceService {
                 if (schema != null) break;
             }
             if (schema == null) {
-                logger.warn("No se encontró el esquema para la tabla: {}", table);
-                return createErrorResponse("No se encontró el esquema para la tabla: " + table);
+                logger.warn("Schema not found for table: {}", table);
+                return createErrorResponse("Schema not found for table: " + table);
             }
         }
         List<Map<String, Object>> columns = prestoService.getTableColumns(schema, table);
-        logger.debug("Columnas de la tabla {}.{}: {}", schema, table, columns);
+        logger.debug("Columns of table {}.{}: {}", schema, table, columns);
         Map<String, Object> response = new HashMap<>();
         response.put("type", "table_description");
         response.put("schema", schema);
         response.put("table", table);
         response.put("columns", columns);
-        response.put("message", String.format("Estructura de la tabla %s.%s", schema, table));
+        response.put("message", String.format("Structure of table %s.%s", schema, table));
         return response;
     }
 
-    private Map<String, Object> handleSampleData(String query) throws SQLException {
-        logger.info("Entrando a handleSampleData con query: {}", query);
+    // --- Standardized MCP response wrapper ---
+    public static class McpResponse<T> {
+        public String trace_id;
+        public String status;
+        public T data;
+        public String error;
+        public McpResponse(String trace_id, String status, T data, String error) {
+            this.trace_id = trace_id;
+            this.status = status;
+            this.data = data;
+            this.error = error;
+        }
+    }
+
+    private McpResponse<Map<String, Object>> handleSampleDataMcp(String query, String traceId) throws SQLException {
+        logger.info("Entering handleSampleData with query: {}", query);
         String tableName = queryParser.extractTableName(query, tokenizerService);
-        logger.debug("Nombre de tabla extraído: {}", tableName);
+        logger.debug("Table name extracted: {}", tableName);
         if (tableName == null) {
-            logger.warn("No se pudo identificar el nombre de la tabla en la consulta");
-            return createErrorResponse("No se pudo identificar el nombre de la tabla en la consulta. Por favor, especifique una tabla.");
+            logger.warn("Could not identify the table name in the query");
+            return new McpResponse<>(traceId, "error", null, "Could not identify the table name in the query. Please specify a table.");
         }
         String[] parts = tableName.split("\\.");
         String schema;
@@ -167,7 +181,7 @@ public class QueryIntelligenceService {
             table = parts[0];
             schema = null;
             List<String> schemas = prestoService.getSchemas();
-            logger.debug("Buscando esquema para la tabla: {}", table);
+            logger.debug("Searching for schema for table: {}", table);
             for (String s : schemas) {
                 List<String> tables = prestoService.getTables(s);
                 for (String t : tables) {
@@ -179,62 +193,106 @@ public class QueryIntelligenceService {
                 if (schema != null) break;
             }
             if (schema == null) {
-                logger.warn("No se encontró el esquema para la tabla: {}", table);
-                return createErrorResponse("No se encontró el esquema para la tabla: " + table);
+                logger.warn("Schema not found for table: {}", table);
+                return new McpResponse<>(traceId, "error", null, "Schema not found for table: " + table);
             }
         }
         List<Map<String, Object>> sampleData = prestoService.getSampleData(schema, table);
-        logger.debug("Datos de ejemplo de {}.{}: {} filas", schema, table, sampleData.size());
         Map<String, Object> response = new HashMap<>();
         response.put("type", "sample_data");
         response.put("schema", schema);
         response.put("table", table);
         response.put("data", sampleData);
-        response.put("message", String.format("Datos de ejemplo de %s.%s (limitado a 10 filas)", schema, table));
+        response.put("message", String.format("Sample data from %s.%s (limited to 10 rows)", schema, table));
+        return new McpResponse<>(traceId, "success", response, null);
+    }
+
+    private Map<String, Object> handleSampleData(String query) throws SQLException {
+        logger.info("Entering handleSampleData with query: {}", query);
+        String tableName = queryParser.extractTableName(query, tokenizerService);
+        logger.debug("Table name extracted: {}", tableName);
+        if (tableName == null) {
+            logger.warn("Could not identify the table name in the query");
+            return createErrorResponse("Could not identify the table name in the query. Please specify a table.");
+        }
+        String[] parts = tableName.split("\\.");
+        String schema;
+        String table;
+        if (parts.length > 1) {
+            schema = parts[0];
+            table = parts[1];
+        } else {
+            table = parts[0];
+            schema = null;
+            List<String> schemas = prestoService.getSchemas();
+            logger.debug("Searching for schema for table: {}", table);
+            for (String s : schemas) {
+                List<String> tables = prestoService.getTables(s);
+                for (String t : tables) {
+                    if (t.equalsIgnoreCase(table)) {
+                        schema = s;
+                        break;
+                    }
+                }
+                if (schema != null) break;
+            }
+            if (schema == null) {
+                logger.warn("Schema not found for table: {}", table);
+                return createErrorResponse("Schema not found for table: " + table);
+            }
+        }
+        List<Map<String, Object>> sampleData = prestoService.getSampleData(schema, table);
+        logger.debug("Sample data from {}.{}: {} rows", schema, table, sampleData.size());
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "sample_data");
+        response.put("schema", schema);
+        response.put("table", table);
+        response.put("data", sampleData);
+        response.put("message", String.format("Sample data from %s.%s (limited to 10 rows)", schema, table));
         return response;
     }
 
     private Map<String, Object> handleSearchTables(String query) throws SQLException {
-        logger.info("Entrando a handleSearchTables con query: {}", query);
+        logger.info("Entering handleSearchTables with query: {}", query);
         String keyword = queryParser.extractSearchKeyword(query, tokenizerService);
-        logger.debug("Palabra clave extraída: {}", keyword);
+        logger.debug("Search keyword extracted: {}", keyword);
         if (keyword == null) {
-            logger.warn("No se pudo identificar la palabra clave de búsqueda en la consulta");
-            return createErrorResponse("No se pudo identificar la palabra clave de búsqueda en la consulta.");
+            logger.warn("Could not identify the search keyword in the query");
+            return createErrorResponse("Could not identify the search keyword in the query.");
         }
         List<String> matchingTables = prestoService.searchTables(keyword);
-        logger.debug("Tablas que coinciden con '{}': {}", keyword, matchingTables);
+        logger.debug("Tables matching '{}': {}", keyword, matchingTables);
         Map<String, Object> response = new HashMap<>();
         response.put("type", "table_search");
         response.put("keyword", keyword);
         response.put("matching_tables", matchingTables);
-        response.put("message", String.format("Tablas que coinciden con la palabra clave '%s'", keyword));
+        response.put("message", String.format("Tables matching the keyword '%s'", keyword));
         return response;
     }
 
     private Map<String, Object> handleDirectSQL(String query) throws SQLException {
-        logger.info("Entrando a handleDirectSQL con query: {}", query);
+        logger.info("Entering handleDirectSQL with query: {}", query);
         List<Map<String, Object>> results = prestoService.executeQuery(query);
-        logger.debug("Resultados obtenidos: {} filas", results.size());
+        logger.debug("Results obtained: {} rows", results.size());
         Map<String, Object> response = new HashMap<>();
         response.put("type", "query_result");
         response.put("sql", query);
         response.put("data", results);
         response.put("row_count", results.size());
-        response.put("message", String.format("Consulta ejecutada correctamente, %d filas devueltas", results.size()));
+        response.put("message", String.format("Query executed successfully, %d rows returned", results.size()));
         return response;
     }
 
     private Map<String, Object> handleListEntity(String query) throws SQLException {
-        logger.info("Entrando a handleListEntity con query: {}", query);
+        logger.info("Entering handleListEntity with query: {}", query);
         String entity = queryParser.extractEntityFromQuery(query, tokenizerService);
-        logger.debug("Entidad extraída: {}", entity);
+        logger.debug("Entity extracted: {}", entity);
         if (entity == null) {
-            logger.warn("No se pudo identificar la entidad en la consulta");
-            return createErrorResponse("No se pudo identificar la entidad en la consulta.");
+            logger.warn("Could not identify the entity in the query");
+            return createErrorResponse("Could not identify the entity in the query.");
         }
         String schema = extractSchemaFromQuery(query);
-        logger.debug("Esquema extraído: {}", schema);
+        logger.debug("Schema extracted: {}", schema);
         Optional<String[]> schemaTable;
         if (schema != null) {
             schemaTable = findTableAndSchemaForEntityInSchema(entity, schema);
@@ -242,14 +300,14 @@ public class QueryIntelligenceService {
             schemaTable = findTableAndSchemaForEntity(entity);
         }
         if (schemaTable.isEmpty()) {
-            logger.warn("No se encontró una tabla para la entidad: {}{}", entity, (schema != null ? (" en el esquema: " + schema) : ""));
-            return createErrorResponse("No se encontró una tabla para la entidad: " + entity + (schema != null ? (" en el esquema: " + schema) : ""));
+            logger.warn("No table found for entity: {}{}", entity, (schema != null ? (" in schema: " + schema) : ""));
+            return createErrorResponse("No table found for entity: " + entity + (schema != null ? (" in schema: " + schema) : ""));
         }
         String foundSchema = schemaTable.get()[0];
         String table = schemaTable.get()[1];
-        logger.debug("Entidad encontrada en {}.{}", foundSchema, table);
+        logger.debug("Entity found in {}.{}", foundSchema, table);
         List<Map<String, Object>> results = prestoService.executeQuery("SELECT * FROM " + foundSchema + "." + table);
-        logger.debug("Filas obtenidas para la entidad {}: {}", entity, results.size());
+        logger.debug("Rows obtained for entity {}: {}", entity, results.size());
         Map<String, Object> response = new HashMap<>();
         response.put("type", "entity_list");
         response.put("entity", entity);
@@ -257,7 +315,7 @@ public class QueryIntelligenceService {
         response.put("table", table);
         response.put("data", results);
         response.put("row_count", results.size());
-        response.put("message", String.format("Lista de %s, %d encontrados", entity, results.size()));
+        response.put("message", String.format("List of %s, %d found", entity, results.size()));
         return response;
     }
 
@@ -268,7 +326,7 @@ public class QueryIntelligenceService {
         if (matcher.find()) {
             String schema = matcher.group(1);
             schema = schema.replaceAll("[.,;:!?]$", "");
-            logger.debug("Esquema extraído por patrón español: {}", schema);
+            logger.debug("Schema extracted by Spanish pattern: {}", schema);
             return schema;
         }
         java.util.regex.Pattern patternEn = java.util.regex.Pattern.compile("in the\\s+([\\w-]+)\\s+schema", java.util.regex.Pattern.CASE_INSENSITIVE);
@@ -276,23 +334,23 @@ public class QueryIntelligenceService {
         if (matcherEn.find()) {
             String schema = matcherEn.group(1);
             schema = schema.replaceAll("[.,;:!?]$", "");
-            logger.debug("Esquema extraído por patrón inglés: {}", schema);
+            logger.debug("Schema extracted by English pattern: {}", schema);
             return schema;
         }
-        logger.debug("No se encontró esquema en la consulta");
+        logger.debug("No schema found in the query");
         return null;
     }
 
     public Optional<String[]> findTableAndSchemaForEntityInSchema(String entity, String schema) {
-        logger.debug("Buscando entidad '{}' en el esquema '{}'", entity, schema);
+        logger.debug("Searching for entity '{}' in schema '{}'", entity, schema);
         for (String table : metadataCacheService.getTables(schema)) {
             String tableLower = table.toLowerCase();
             if (tableLower.contains(entity) || tableLower.contains(entity + "s") || tableLower.contains(entity + "es")) {
-                logger.debug("Entidad '{}' encontrada en la tabla '{}'", entity, table);
+                logger.debug("Entity '{}' found in table '{}'", entity, table);
                 return Optional.of(new String[]{schema, table});
             }
         }
-        logger.debug("Entidad '{}' no encontrada en el esquema '{}'", entity, schema);
+        logger.debug("Entity '{}' not found in schema '{}'", entity, schema);
         return Optional.empty();
     }
 
@@ -309,7 +367,7 @@ public class QueryIntelligenceService {
     }
 
     public List<String> getQuerySuggestions() {
-        logger.info("Obteniendo sugerencias de consulta");
+        logger.info("Getting query suggestions");
         return Arrays.asList(
                 "Show all tables",
                 "List tables in schema_name",
@@ -317,23 +375,68 @@ public class QueryIntelligenceService {
                 "Show sample data from table_name",
                 "Find tables containing keyword",
                 "SELECT * FROM schema.table LIMIT 10",
-                "Lista de países",
-                "Lista de vendedores"
+                "List of countries",
+                "List of sellers"
         );
     }
 
     public Optional<String[]> findTableAndSchemaForEntity(String entity) {
-        logger.debug("Buscando entidad '{}' en todos los esquemas", entity);
+        logger.debug("Searching for entity '{}' in all schemas", entity);
         for (String schema : metadataCacheService.getSchemas()) {
             for (String table : metadataCacheService.getTables(schema)) {
                 String tableLower = table.toLowerCase();
                 if (tableLower.contains(entity) || tableLower.contains(entity + "s") || tableLower.contains(entity + "es")) {
-                    logger.debug("Entidad '{}' encontrada en {}.{}", entity, schema, table);
+                    logger.debug("Entity '{}' found in {}.{}", entity, schema, table);
                     return Optional.of(new String[]{schema, table});
                 }
             }
         }
-        logger.debug("Entidad '{}' no encontrada en ningún esquema", entity);
+        logger.debug("Entity '{}' not found in any schema", entity);
         return Optional.empty();
+    }
+
+    public McpResponse<Map<String, Object>> handleDescribeTableMcp(String query, String traceId) throws SQLException {
+        logger.info("Entering handleDescribeTable with query: {}", query);
+        String tableName = queryParser.extractTableName(query, tokenizerService);
+        logger.debug("Table name extracted: {}", tableName);
+        if (tableName == null) {
+            logger.warn("Could not identify the table name in the query");
+            return new McpResponse<>(traceId, "error", null, "Could not identify the table name in the query. Please specify a table.");
+        }
+        String[] parts = tableName.split("\\.");
+        String schema;
+        String table;
+        if (parts.length > 1) {
+            schema = parts[0];
+            table = parts[1];
+        } else {
+            table = parts[0];
+            schema = null;
+            List<String> schemas = prestoService.getSchemas();
+            logger.debug("Searching for schema for table: {}", table);
+            for (String s : schemas) {
+                List<String> tables = prestoService.getTables(s);
+                for (String t : tables) {
+                    if (t.equalsIgnoreCase(table)) {
+                        schema = s;
+                        break;
+                    }
+                }
+                if (schema != null) break;
+            }
+            if (schema == null) {
+                logger.warn("Schema not found for table: {}", table);
+                return new McpResponse<>(traceId, "error", null, "Schema not found for table: " + table);
+            }
+        }
+        List<Map<String, Object>> columns = prestoService.getTableColumns(schema, table);
+        logger.debug("Columns of table {}.{}: {}", schema, table, columns);
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "table_description");
+        response.put("schema", schema);
+        response.put("table", table);
+        response.put("columns", columns);
+        response.put("message", String.format("Structure of table %s.%s", schema, table));
+        return new McpResponse<>(traceId, "success", response, null);
     }
 }

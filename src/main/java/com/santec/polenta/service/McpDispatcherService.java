@@ -3,12 +3,13 @@ package com.santec.polenta.service;
 import com.santec.polenta.model.mcp.McpTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class McpDispatcherService {
@@ -166,18 +167,10 @@ public class McpDispatcherService {
                     String query = (String) arguments.get("query");
                     result = queryIntelligenceService.processNaturalQuery(query);
                     break;
-                case "list_tables":
-                    result = queryIntelligenceService.processNaturalQuery("show all tables");
-                    break;
-                case "accessible_tables":
-                    result = queryIntelligenceService.processNaturalQuery("show accessible tables");
-                    break;
-                case "describe_table":
-                    if (arguments == null || arguments.get("table_name") == null) {
-                        throw new IllegalArgumentException("Parameter 'table_name' is required and cannot be null");
-                    }
-                    String tableName = (String) arguments.get("table_name");
-                    result = queryIntelligenceService.processNaturalQuery("describe table " + tableName);
+                case "metadata":
+                    String schema = arguments != null ? (String) arguments.get("schema") : null;
+                    String table = arguments != null ? (String) arguments.get("table") : null;
+                    result = metadataCacheTool.metadata(schema, table);
                     break;
                 case "sample_data":
                     if (arguments == null || arguments.get("table_name") == null) {
@@ -200,36 +193,6 @@ public class McpDispatcherService {
                     suggestions.put("message", "Helpful query suggestions");
                     result = suggestions;
                     break;
-                case "schemas":
-                    Set<String> schemas = metadataCacheTool.schemas();
-                    result = new HashMap<>();
-                    result.put("schemas", schemas);
-                    result.put("message", "Lista de esquemas disponibles");
-                    break;
-                case "tables":
-                    if (arguments == null || arguments.get("schema") == null) {
-                        throw new IllegalArgumentException("Parameter 'schema' is required and cannot be null");
-                    }
-                    String schema = (String) arguments.get("schema");
-                    Set<String> tables = metadataCacheTool.tables(schema);
-                    result = new HashMap<>();
-                    result.put("schema", schema);
-                    result.put("tables", tables);
-                    result.put("message", "Lista de tablas del esquema " + schema);
-                    break;
-                case "columns":
-                    if (arguments == null || arguments.get("schema") == null || arguments.get("table") == null) {
-                        throw new IllegalArgumentException("Parameters 'schema' and 'table' are required and cannot be null");
-                    }
-                    String schemaCol = (String) arguments.get("schema");
-                    String tableCol = (String) arguments.get("table");
-                    List<String> columns = metadataCacheTool.columns(schemaCol, tableCol);
-                    result = new HashMap<>();
-                    result.put("schema", schemaCol);
-                    result.put("table", tableCol);
-                    result.put("columns", columns);
-                    result.put("message", "Lista de columnas de " + schemaCol + "." + tableCol);
-                    break;
                 default:
                     throw new IllegalArgumentException("Unknown tool: " + toolName);
             }
@@ -246,7 +209,7 @@ public class McpDispatcherService {
             result.put("error_message", e.getMessage());
             result.put("execution_id", UUID.randomUUID().toString());
             result.put("timestamp", System.currentTimeMillis());
-            result.put("user_message", "Ocurrió un error al ejecutar la herramienta.");
+            result.put("user_message", "An error occurred while executing the tool.");
         }
         return result;
     }
@@ -351,4 +314,3 @@ public class McpDispatcherService {
         return schema;
     }
 }
-

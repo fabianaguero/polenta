@@ -1,0 +1,42 @@
+spring:
+  config:
+    activate:
+      on-profile: aws
+  application:
+    name: polenta-mcp-server
+
+presto:
+  url: ${PRESTO_URL}
+  user: ${PRESTO_USER}
+  password: ${PRESTO_PASSWORD}
+  catalog: ${PRESTO_CATALOG}
+  schema: ${PRESTO_SCHEMA}
+  maxPoolSize: 10
+  connectionTimeout: 30000
+  queryTimeout: 60000
+
+mcp:
+  server:
+    name: "Polenta Data Lake Server (AWS)"
+    version: "1.0.0"
+    description: "MCP Server for AWS Trino"
+  helpers:
+    enabled: true
+
+logging:
+  level:
+    com.santec.polenta: DEBUG
+    io.trino: INFO
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
