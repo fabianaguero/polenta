@@ -14,31 +14,31 @@ public class ToolRegistry {
         return List.of(
             new McpTool(
                 "query_data",
-                "Ejecuta una consulta en lenguaje natural o SQL sobre el data lake. Ejemplo: 'Dame las ventas del último mes' o 'SELECT * FROM ventas LIMIT 10'",
+                "Executes a natural language or SQL query on the data lake. Example: 'Show me sales from last month' or 'SELECT * FROM sales LIMIT 10'",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
                         "query", Map.of(
                             "type", "string",
-                            "description", "Consulta en lenguaje natural o SQL. Puede ser una pregunta en español o una sentencia SQL completa. Ejemplos: '¿Cuántos clientes nuevos hubo en julio?', 'SELECT * FROM clientes WHERE fecha_alta >= \"2023-07-01\"'.",
+                            "description", "Natural language or SQL query. Can be a question in English or a full SQL statement. Examples: 'How many new customers were there in July?', 'SELECT * FROM customers WHERE signup_date >= \"2023-07-01\"'.",
                             "examples", List.of(
-                                "¿Cuántos clientes nuevos hubo en julio?",
-                                "SELECT * FROM clientes WHERE fecha_alta >= '2023-07-01'",
-                                "Dame las ventas del último mes",
-                                "¿Cuál fue el total de ventas en agosto?",
-                                "Dame el promedio de ventas por cliente en 2024",
-                                "SELECT COUNT(*) FROM ventas WHERE monto > 10000"
+                                "How many new customers were there in July?",
+                                "SELECT * FROM customers WHERE signup_date >= '2023-07-01'",
+                                "Show me sales from last month",
+                                "What was the total sales in August?",
+                                "Show me the average sales per customer in 2024",
+                                "SELECT COUNT(*) FROM sales WHERE amount > 10000"
                             ),
-                            "format", "string o SQL"
+                            "format", "string or SQL"
                         )
                     ),
                     "required", List.of("query"),
                     "examples", List.of(
-                        Map.of("query", "¿Cuántos clientes nuevos hubo en julio?"),
-                        Map.of("query", "SELECT * FROM clientes WHERE fecha_alta >= '2023-07-01'"),
-                        Map.of("query", "Dame el promedio de ventas por cliente en 2024")
+                        Map.of("query", "How many new customers were there in July?"),
+                        Map.of("query", "SELECT * FROM customers WHERE signup_date >= '2023-07-01'"),
+                        Map.of("query", "Show me the average sales per customer in 2024")
                     ),
-                    "description_long", "El parámetro 'query' acepta tanto lenguaje natural como SQL. El sistema intentará inferir el significado y devolver los datos más relevantes."
+                    "description_long", "The 'query' parameter accepts both natural language and SQL. The system will try to infer the meaning and return the most relevant data."
                 ),
                 Map.of(
                     "result_type", "query_result",
@@ -46,202 +46,224 @@ public class ToolRegistry {
                     "examples", List.of(
                         Map.of(
                             "status", "success",
-                            "data", List.of(Map.of("cliente_id", 1, "nombre", "Juan")),
-                            "user_message", "Consulta ejecutada correctamente",
+                            "data", List.of(Map.of("customer_id", 1, "name", "John")),
+                            "user_message", "Query executed successfully",
                             "execution_id", "abc-123",
                             "timestamp", 1723372800000L
                         ),
                         Map.of(
                             "status", "success",
-                            "data", List.of(Map.of("venta_id", 101, "monto", 5000)),
-                            "user_message", "Ventas del último mes: 5000",
+                            "data", List.of(Map.of("sale_id", 101, "amount", 5000)),
+                            "user_message", "Sales from last month: 5000",
                             "execution_id", "def-456",
                             "timestamp", 1723372800000L
                         ),
                         Map.of(
                             "status", "error",
-                            "user_message", "Error de sintaxis en la consulta",
+                            "user_message", "Syntax error in the query",
                             "execution_id", "err-789",
                             "timestamp", 1723372800000L
                         )
                     ),
                     "usage_examples", List.of(
-                        "Dame las ventas del último mes",
-                        "¿Cuántos clientes nuevos hubo en julio?",
-                        "SELECT * FROM ventas LIMIT 10",
-                        "¿Cuál fue el total de ventas en agosto?",
-                        "Dame el promedio de ventas por cliente en 2024",
-                        "SELECT COUNT(*) FROM ventas WHERE monto > 10000"
+                        "Show me sales from last month",
+                        "How many new customers were there in July?",
+                        "SELECT * FROM sales LIMIT 10",
+                        "What was the total sales in August?",
+                        "Show me the average sales per customer in 2024",
+                        "SELECT COUNT(*) FROM sales WHERE amount > 10000"
                     ),
-                    "tags", List.of("consulta", "sql", "data", "ventas", "clientes", "agregados", "estadísticas"),
+                    "tags", List.of("query", "sql", "data", "sales", "customers", "aggregates", "statistics"),
                     "version", "1.3",
-                    "author", "Equipo Data Lake",
+                    "author", "Data Lake Team",
                     "last_updated", "2025-08-11",
-                    "description_long", "Permite realizar consultas complejas en lenguaje natural o SQL sobre el data lake, devolviendo resultados tabulares o agregados según corresponda. Soporta filtros, agrupamientos y funciones de agregación. Ejemplo de uso avanzado: 'Dame el top 5 de productos más vendidos en 2024 agrupado por mes'."
+                    "description_long", "Allows complex queries in natural language or SQL on the data lake, returning tabular or aggregated results as appropriate. Supports filters, groupings, and aggregation functions. Advanced usage example: 'Show me the top 5 best-selling products in 2024 grouped by month'."
                 )
             ),
             new McpTool(
-                "metadata",
-                "Explora esquemas, tablas y columnas del data lake.",
+                "list_tables",
+                "Lists all tables available in the data lake.",
                 Map.of(
                     "type", "object",
-                    "properties", Map.of(
-                        "schema", Map.of(
-                            "type", "string",
-                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas'"
-                        ),
-                        "table", Map.of(
-                            "type", "string",
-                            "description", "Nombre de la tabla dentro del esquema. Ejemplo: 'clientes'"
-                        )
-                    ),
+                    "properties", Map.of(),
                     "required", List.of(),
-                    "examples", List.of(
-                        Map.of(),
-                        Map.of("schema", "default"),
-                        Map.of("schema", "default", "table", "clientes")
-                    ),
-                    "description_long", "Sin parámetros devuelve los esquemas disponibles. Con 'schema' lista las tablas del esquema. Con 'schema' y 'table' describe las columnas de la tabla."
+                    "examples", List.of(Map.of()),
+                    "description_long", "Does not require parameters. Returns a list grouped by schema of all tables accessible in the data lake."
                 ),
                 Map.of(
-                    "result_type", "metadata",
-                    "fields", List.of("schemas", "schema", "tables", "table", "columns", "message"),
+                    "result_type", "table_list",
+                    "fields", List.of("schemas"),
                     "examples", List.of(
                         Map.of(
-                            "schemas", List.of("default", "finanzas"),
-                            "message", "Lista de esquemas disponibles"
-                        ),
+                            "schemas", Map.of("default", List.of("customers", "sales"), "finance", List.of("payments", "invoices"))),
                         Map.of(
-                            "schema", "default",
-                            "tables", List.of("clientes", "ventas"),
-                            "message", "Lista de tablas del esquema default"
-                        ),
-                        Map.of(
-                            "schema", "default",
-                            "table", "clientes",
-                            "columns", List.of(
-                                Map.of("Column", "cliente_id", "Type", "bigint"),
-                                Map.of("Column", "nombre", "Type", "varchar")
-                            ),
-                            "message", "Estructura de la tabla default.clientes"
-                        )
+                            "schemas", Map.of("default", List.of("products", "suppliers")))
                     ),
                     "usage_examples", List.of(
-                        "Listar esquemas disponibles",
-                        "Mostrar tablas del esquema default",
-                        "Describir la tabla clientes en default"
+                        "What tables are there?",
+                        "List all tables",
+                        "Show available tables",
+                        "What are the tables in the finance schema?"
                     ),
-                    "tags", List.of("metadata", "esquemas", "tablas", "columnas"),
-                    "version", "1.0",
-                    "author", "Equipo Data Lake",
+                    "tags", List.of("metadata", "tables", "listing", "exploration", "schemas"),
+                    "version", "1.2",
+                    "author", "Data Lake Team",
                     "last_updated", "2025-08-11",
-                    "description_long", "Permite navegar el catálogo de datos en un único punto."
+                    "description_long", "Returns a list grouped by schema of all tables accessible in the data lake. Useful for exploration and data discovery."
                 )
             ),
             new McpTool(
-                "sample_data",
-                "Devuelve datos de ejemplo de una tabla específica. Ejemplo: 'Dame 10 filas de clientes'",
+                "describe_table",
+                "Returns the structure of a specific table. Example: 'Describe the customers table' or 'What columns does sales have?'",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
                         "table_name", Map.of(
                             "type", "string",
-                            "description", "Nombre de la tabla para obtener datos de ejemplo. Ejemplo: 'clientes', 'default.ventas'.",
-                            "examples", List.of("clientes", "default.ventas", "ventas", "finanzas.pagos")
+                            "description", "Name of the table to describe (format: schema.table or just table). Example: 'customers', 'default.sales'.",
+                            "examples", List.of("customers", "default.sales", "sales", "finance.payments")
                         )
                     ),
                     "required", List.of("table_name"),
                     "examples", List.of(
-                        Map.of("table_name", "clientes"),
-                        Map.of("table_name", "default.ventas"),
-                        Map.of("table_name", "finanzas.pagos")
+                        Map.of("table_name", "customers"),
+                        Map.of("table_name", "default.sales"),
+                        Map.of("table_name", "finance.payments")
                     ),
-                    "description_long", "El parámetro 'table_name' debe ser el nombre exacto de la tabla."
+                    "description_long", "The 'table_name' parameter must be the exact name of the table, with or without schema."
+                ),
+                Map.of(
+                    "result_type", "table_description",
+                    "fields", List.of("schema", "table", "columns"),
+                    "examples", List.of(
+                        Map.of(
+                            "schema", "default",
+                            "table", "customers",
+                            "columns", List.of(Map.of("name", "customer_id", "type", "int"), Map.of("name", "name", "type", "string"))
+                        ),
+                        Map.of(
+                            "schema", "finance",
+                            "table", "payments",
+                            "columns", List.of(Map.of("name", "payment_id", "type", "int"), Map.of("name", "amount", "type", "decimal"), Map.of("name", "date", "type", "date"))
+                        )
+                    ),
+                    "usage_examples", List.of(
+                        "Describe the customers table",
+                        "What columns does sales have?",
+                        "Structure of default.sales",
+                        "What is the table finance.payments like?"
+                    ),
+                    "tags", List.of("metadata", "tables", "structure", "describe", "columns"),
+                    "version", "1.2",
+                    "author", "Data Lake Team",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Returns the column names and types of a table, useful for exploration and data validation. Includes name, type, and order of the columns."
+                )
+            ),
+            new McpTool(
+                "sample_data",
+                "Returns sample data from a specific table. Example: 'Give me 10 rows from customers'",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "table_name", Map.of(
+                            "type", "string",
+                            "description", "Name of the table to get sample data from. Example: 'customers', 'default.sales'.",
+                            "examples", List.of("customers", "default.sales", "sales", "finance.payments")
+                        )
+                    ),
+                    "required", List.of("table_name"),
+                    "examples", List.of(
+                        Map.of("table_name", "customers"),
+                        Map.of("table_name", "default.sales"),
+                        Map.of("table_name", "finance.payments")
+                    ),
+                    "description_long", "The 'table_name' parameter must be the exact name of the table."
                 ),
                 Map.of(
                     "result_type", "sample_data",
                     "fields", List.of("table_name", "rows"),
                     "examples", List.of(
                         Map.of(
-                            "table_name", "clientes",
-                            "rows", List.of(Map.of("cliente_id", 1, "nombre", "Juan"), Map.of("cliente_id", 2, "nombre", "Ana"))
+                            "table_name", "customers",
+                            "rows", List.of(Map.of("customer_id", 1, "name", "John"), Map.of("customer_id", 2, "name", "Ana"))
                         ),
                         Map.of(
-                            "table_name", "ventas",
-                            "rows", List.of(Map.of("venta_id", 101, "monto", 5000), Map.of("venta_id", 102, "monto", 7000))
+                            "table_name", "sales",
+                            "rows", List.of(Map.of("sale_id", 101, "amount", 5000), Map.of("sale_id", 102, "amount", 7000))
                         ),
                         Map.of(
-                            "table_name", "finanzas.pagos",
-                            "rows", List.of(Map.of("pago_id", 1, "monto", 1000, "fecha", "2024-01-10"), Map.of("pago_id", 2, "monto", 2000, "fecha", "2024-01-11"))
+                            "table_name", "finance.payments",
+                            "rows", List.of(Map.of("payment_id", 1, "amount", 1000, "date", "2024-01-10"), Map.of("payment_id", 2, "amount", 2000, "date", "2024-01-11"))
                         )
                     ),
                     "usage_examples", List.of(
-                        "Dame 10 filas de clientes",
-                        "Muestra datos de ejemplo de ventas",
-                        "Sample de default.ventas",
-                        "Dame 5 filas de finanzas.pagos"
+                        "Give me 10 rows from customers",
+                        "Show sample data from sales",
+                        "Sample of default.sales",
+                        "Give me 5 rows from finance.payments"
                     ),
-                    "tags", List.of("datos", "ejemplo", "tablas", "sample", "preview"),
+                    "tags", List.of("data", "sample", "tables", "preview"),
                     "version", "1.2",
-                    "author", "Equipo Data Lake",
+                    "author", "Data Lake Team",
                     "last_updated", "2025-08-11",
-                    "description_long", "Devuelve un subconjunto de filas de una tabla para facilitar la exploración y validación de datos. Permite ver la estructura y algunos valores reales."
+                    "description_long", "Returns a subset of rows from a table to facilitate exploration and data validation. Allows viewing the structure and some real values."
                 )
             ),
             new McpTool(
                 "search_tables",
-                "Busca tablas que contengan una palabra clave. Ejemplo: 'Buscar tablas con ventas'",
+                "Searches for tables that contain a keyword. Example: 'Search tables with sales'",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
                         "keyword", Map.of(
                             "type", "string",
-                            "description", "Palabra clave para buscar en los nombres de las tablas. Ejemplo: 'ventas', 'clientes', 'producto'.",
-                            "examples", List.of("ventas", "clientes", "producto", "finanzas")
+                            "description", "Keyword to search in the table names. Example: 'sales', 'customers', 'product'.",
+                            "examples", List.of("sales", "customers", "product", "finance")
                         )
                     ),
                     "required", List.of("keyword"),
                     "examples", List.of(
-                        Map.of("keyword", "ventas"),
-                        Map.of("keyword", "finanzas")
+                        Map.of("keyword", "sales"),
+                        Map.of("keyword", "finance")
                     ),
-                    "description_long", "El parámetro 'keyword' debe ser una palabra o fragmento relevante para buscar en los nombres de las tablas."
+                    "description_long", "The 'keyword' parameter must be a relevant word or fragment to search in the table names."
                 ),
                 Map.of(
                     "result_type", "table_search",
                     "fields", List.of("keyword", "matching_tables"),
                     "examples", List.of(
                         Map.of(
-                            "keyword", "ventas",
-                            "matching_tables", List.of("default.ventas", "default.ventas_2023", "finanzas.ventas")
+                            "keyword", "sales",
+                            "matching_tables", List.of("default.sales", "default.sales_2023", "finance.sales")
                         ),
                         Map.of(
-                            "keyword", "clientes",
-                            "matching_tables", List.of("default.clientes", "historico.clientes")
+                            "keyword", "customers",
+                            "matching_tables", List.of("default.customers", "historical.customers")
                         )
                     ),
                     "usage_examples", List.of(
-                        "Buscar tablas con ventas",
-                        "Mostrar tablas que contienen clientes",
-                        "Tablas con producto",
-                        "Buscar tablas de finanzas"
+                        "Search tables with sales",
+                        "Show tables that contain customers",
+                        "Tables with product",
+                        "Search tables in finance"
                     ),
-                    "tags", List.of("busqueda", "tablas", "metadata", "search", "descubrimiento"),
+                    "tags", List.of("search", "tables", "metadata", "discovery"),
                     "version", "1.2",
-                    "author", "Equipo Data Lake",
+                    "author", "Data Lake Team",
                     "last_updated", "2025-08-11",
-                    "description_long", "Permite buscar tablas por palabra clave en su nombre, útil para grandes catálogos de datos. Devuelve coincidencias exactas y parciales."
+                    "description_long", "Allows searching tables by keyword in their name, useful for large data catalogs. Returns exact and partial matches."
                 )
             ),
             new McpTool(
                 "get_suggestions",
-                "Obtiene sugerencias de consultas útiles para el usuario.",
+                "Gets useful query suggestions for the user.",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(),
                     "required", List.of(),
                     "examples", List.of(Map.of()),
-                    "description_long", "No requiere parámetros. Devuelve una lista de sugerencias de consultas útiles para usuarios nuevos o que buscan inspiración."
+                    "description_long", "Does not require parameters. Returns a list of useful query suggestions for new users or those seeking inspiration."
                 ),
                 Map.of(
                     "result_type", "suggestions",
@@ -250,27 +272,128 @@ public class ToolRegistry {
                         Map.of(
                             "suggestions", List.of(
                                 "Show all tables",
-                                "Describe table clientes",
-                                "SELECT * FROM ventas LIMIT 10",
-                                "¿Cuántos clientes nuevos hubo en julio?",
-                                "Dame el promedio de ventas por cliente en 2024"
+                                "Describe table customers",
+                                "SELECT * FROM sales LIMIT 10",
+                                "How many new customers were there in July?",
+                                "Show me the average sales per customer in 2024"
                             ),
-                            "message", "Sugerencias de consulta"
+                            "message", "Query suggestions"
                         )
                     ),
                     "usage_examples", List.of(
-                        "¿Qué puedo consultar?",
-                        "Sugerencias para empezar",
-                        "Ayuda de consultas",
-                        "¿Cómo exploro los datos?"
+                        "What can I query?",
+                        "Suggestions to get started",
+                        "Query help",
+                        "How do I explore the data?"
                     ),
-                    "tags", List.of("sugerencias", "consulta", "ayuda", "tips", "inspiración"),
+                    "tags", List.of("suggestions", "query", "help", "tips", "inspiration"),
                     "version", "1.2",
-                    "author", "Equipo Data Lake",
+                    "author", "Data Lake Team",
                     "last_updated", "2025-08-11",
-                    "description_long", "Devuelve una lista de sugerencias de consultas útiles para usuarios nuevos o que buscan inspiración. Incluye ejemplos de preguntas y sentencias SQL."
+                    "description_long", "Returns a list of useful query suggestions for new users or those seeking inspiration. Includes examples of questions and SQL statements."
                 )
             ),
+            new McpTool(
+                "schemas",
+                "Returns the list of available schemas in the data lake.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(),
+                    "required", List.of(),
+                    "examples", List.of(Map.of()),
+                    "description_long", "Does not require parameters. Returns a list of all available schemas."
+                ),
+                Map.of(
+                    "result_type", "schemas_list",
+                    "fields", List.of("schemas"),
+                    "examples", List.of(
+                        Map.of("schemas", List.of("default", "finance", "sales")),
+                        Map.of("schemas", List.of("tiny", "tpch"))
+                    ),
+                    "usage_examples", List.of(
+                        "List schemas",
+                        "What schemas are there?",
+                        "Show all schemas"
+                    ),
+                    "tags", List.of("metadata", "schemas", "exploration"),
+                    "version", "1.0",
+                    "author", "Data Lake Team",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Returns a list of all available schemas in the data lake."
+                )
+            ),
+            new McpTool(
+                "tables",
+                "Returns the list of tables in a specific schema.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "schema", Map.of(
+                            "type", "string",
+                            "description", "Name of the schema. Example: 'default', 'finance', 'tiny'"
+                        )
+                    ),
+                    "required", List.of("schema"),
+                    "examples", List.of(Map.of("schema", "default")),
+                    "description_long", "The 'schema' parameter is mandatory. Returns all tables in the specified schema."
+                ),
+                Map.of(
+                    "result_type", "tables_list",
+                    "fields", List.of("schema", "tables"),
+                    "examples", List.of(
+                        Map.of("schema", "default", "tables", List.of("customers", "sales")),
+                        Map.of("schema", "tiny", "tables", List.of("nation", "region"))
+                    ),
+                    "usage_examples", List.of(
+                        "List tables in the default schema",
+                        "What tables are in finance?",
+                        "Show tables in tiny"
+                    ),
+                    "tags", List.of("metadata", "tables", "exploration", "schemas"),
+                    "version", "1.0",
+                    "author", "Data Lake Team",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Returns all tables in the specified schema."
+                )
+            ),
+            new McpTool(
+                "columns",
+                "Returns the list of columns in a specific table.",
+                Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                        "schema", Map.of(
+                            "type", "string",
+                            "description", "Name of the schema. Example: 'default', 'finance', 'tiny'"
+                        ),
+                        "table", Map.of(
+                            "type", "string",
+                            "description", "Name of the table. Example: 'customers', 'nation'"
+                        )
+                    ),
+                    "required", List.of("schema", "table"),
+                    "examples", List.of(Map.of("schema", "default", "table", "customers")),
+                    "description_long", "The 'schema' and 'table' parameters are mandatory. Returns all columns in the specified table."
+                ),
+                Map.of(
+                    "result_type", "columns_list",
+                    "fields", List.of("schema", "table", "columns"),
+                    "examples", List.of(
+                        Map.of("schema", "default", "table", "customers", "columns", List.of("customer_id", "name", "signup_date")),
+                        Map.of("schema", "tiny", "table", "nation", "columns", List.of("nationkey", "name", "regionkey"))
+                    ),
+                    "usage_examples", List.of(
+                        "List columns of customers in default",
+                        "What columns does the nation table have in tiny?",
+                        "Show columns of sales in finance"
+                    ),
+                    "tags", List.of("metadata", "columns", "exploration", "tables"),
+                    "version", "1.0",
+                    "author", "Data Lake Team",
+                    "last_updated", "2025-08-11",
+                    "description_long", "Returns all columns in the specified table."
+                )
+            )
         );
     }
 }

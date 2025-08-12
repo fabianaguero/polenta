@@ -3,12 +3,13 @@ package com.santec.polenta.service;
 import com.santec.polenta.model.mcp.McpTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class McpDispatcherService {
@@ -208,7 +209,7 @@ public class McpDispatcherService {
             result.put("error_message", e.getMessage());
             result.put("execution_id", UUID.randomUUID().toString());
             result.put("timestamp", System.currentTimeMillis());
-            result.put("user_message", "Ocurrió un error al ejecutar la herramienta.");
+            result.put("user_message", "An error occurred while executing the tool.");
         }
         return result;
     }
@@ -313,4 +314,3 @@ public class McpDispatcherService {
         return schema;
     }
 }
-

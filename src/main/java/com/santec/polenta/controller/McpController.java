@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +14,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.*;
-import ch.qos.logback.classic.Level;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/mcp")
@@ -29,37 +30,48 @@ public class McpController {
     @Autowired
     private McpDispatcherService dispatcherService;
 
+    public static class McpResponse<T> {
+        public String trace_id;
+        public String status;
+        public T data;
+        public String error;
+        public McpResponse(String trace_id, String status, T data, String error) {
+            this.trace_id = trace_id;
+            this.status = status;
+            this.data = data;
+            this.error = error;
+        }
+    }
+
     @PostMapping("/initialize")
     @Operation(
-            summary = "[HELPER] Inicializa la conexión con el servidor MCP",
+            summary = "[HELPER] Initializes the connection with the MCP server",
             description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(
-                                    name = "Ejemplo de request",
+                                    name = "Request example",
                                     value = "{ \"jsonrpc\": \"2.0\", \"id\": \"1\", \"method\": \"initialize\", \"params\": {} }"
                             )
                     )
             )
     )
-    public ResponseEntity<Map<String, Object>> initialize(
+    public ResponseEntity<McpResponse<Map<String, Object>>> initialize(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request,
             HttpServletRequest httpRequest) {
-        logger.info("Helper endpoint /mcp/initialize called with parameters: {}", request);
-        
-        // Extract fields for internal JSON-RPC call
+        String traceId = java.util.UUID.randomUUID().toString();
+        logger.info("Helper endpoint /mcp/initialize called with parameters: {} | trace_id={}", request, traceId);
         String id = (String) request.get("id");
         Map<String, Object> params = (Map<String, Object>) request.get("params");
         String sessionId = generateSessionId(httpRequest);
-        
         try {
             Map<String, Object> result = dispatcherService.dispatch("initialize", params, sessionId);
-            return ResponseEntity.ok(jsonRpcSuccess(id, result));
+            return ResponseEntity.ok(new McpResponse<>(traceId, "success", result, null));
         } catch (Exception e) {
-            logger.error("Error in helper initialize endpoint: {}", e.getMessage(), e);
-            return ResponseEntity.ok(jsonRpcError(id, -32603, "Internal error: " + e.getMessage(), null));
+            logger.error("Error in helper initialize endpoint: {} | trace_id={}", e.getMessage(), traceId, e);
+            return ResponseEntity.ok(new McpResponse<>(traceId, "error", null, e.getMessage()));
         }
     }
 
@@ -67,14 +79,14 @@ public class McpController {
 
     @PostMapping("/tools/list")
     @Operation(
-            summary = "[HELPER] Lista las herramientas disponibles",
+            summary = "[HELPER] Lists available tools",
             description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(
-                                    name = "Ejemplo de request",
+                                    name = "Request example",
                                     value = "{ \"jsonrpc\": \"2.0\", \"id\": \"2\", \"method\": \"tools/list\", \"params\": {} }"
                             )
                     )
@@ -98,15 +110,15 @@ public class McpController {
 
     @PostMapping("/tools/call")
     @Operation(
-            summary = "[HELPER] Ejecuta una herramienta específica",
+            summary = "[HELPER] Executes a specific tool",
             description = "Non-standard helper endpoint. Use POST /mcp with JSON-RPC for standard compliance.",
             requestBody = @RequestBody(
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(
-                                    name = "Ejemplo de request",
-                                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"method\": \"tools/call\", \"params\": { \"name\": \"query_data\", \"arguments\": { \"query\": \"SELECT * FROM tabla\" } } }"
+                                    name = "Request example",
+                                    value = "{ \"jsonrpc\": \"2.0\", \"id\": \"3\", \"method\": \"tools/call\", \"params\": { \"name\": \"query_data\", \"arguments\": { \"query\": \"SELECT * FROM table\" } } }"
                             )
                     )
             )
@@ -130,11 +142,11 @@ public class McpController {
         }
     }
 
-    // Nuevo endpoint para documentación de tools
+    // New endpoint for tools documentation
     @GetMapping("/tools/docs")
     @Operation(
-        summary = "[HELPER] Documentación de todas las herramientas MCP",
-        description = "Devuelve la documentación y schemas de todas las herramientas registradas en el servidor."
+        summary = "[HELPER] Documentation for all MCP tools",
+        description = "Returns the documentation and schemas of all tools registered on the server."
     )
     public ResponseEntity<Map<String, Object>> toolsDocs() {
         logger.info("Helper endpoint /mcp/tools/docs called");

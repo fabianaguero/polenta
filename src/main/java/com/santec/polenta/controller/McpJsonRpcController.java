@@ -1,21 +1,24 @@
 package com.santec.polenta.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.santec.polenta.service.McpDispatcherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -59,8 +62,8 @@ public class McpJsonRpcController {
     public ResponseEntity<Map<String, Object>> handleJsonRpc(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request,
             HttpServletRequest httpRequest) {
-        
-        logger.info("Received JSON-RPC request: {}", request);
+        String traceId = UUID.randomUUID().toString();
+        logger.info("Received JSON-RPC request: {} | trace_id={}", request, traceId);
         
         // Extract JSON-RPC fields
         String jsonrpc = (String) request.get("jsonrpc");
@@ -85,23 +88,102 @@ public class McpJsonRpcController {
         try {
             // Dispatch to service
             Map<String, Object> result = dispatcherService.dispatch(method, params, sessionId);
-            return ResponseEntity.ok(createJsonRpcSuccess(id, result));
-            
+            return ResponseEntity.ok(createJsonRpcSuccess(id, result, traceId));
         } catch (IllegalArgumentException e) {
-            // Handle method not found (-32601) or invalid params (-32602)
-            logger.warn("Invalid request for method {}: {}", method, e.getMessage());
+            logger.warn("Invalid request for method {}: {} | trace_id={}", method, e.getMessage(), traceId);
             int errorCode = isMethodNotFound(method, e) ? -32601 : -32602;
-            return ResponseEntity.ok(createJsonRpcError(id, errorCode, e.getMessage(), null));
-            
+            return ResponseEntity.ok(createJsonRpcError(id, errorCode, e.getMessage(), Map.of(
+                "trace_id", traceId,
+                "params", params,
+                "user", request.getOrDefault("user", null)
+            )));
         } catch (IllegalStateException e) {
-            // Handle state errors (like ping without initialize)
-            logger.warn("State error for method {}: {}", method, e.getMessage());
-            return ResponseEntity.ok(createJsonRpcError(id, -32000, e.getMessage(), null));
-            
+            logger.warn("State error for method {}: {} | trace_id={}", method, e.getMessage(), traceId);
+            return ResponseEntity.ok(createJsonRpcError(id, -32000, e.getMessage(), Map.of(
+                "trace_id", traceId,
+                "params", params,
+                "user", request.getOrDefault("user", null)
+            )));
         } catch (Exception e) {
-            // Handle internal errors (-32603)
-            logger.error("Internal error processing method {}: {}", method, e.getMessage(), e);
-            return ResponseEntity.ok(createJsonRpcError(id, -32603, "Internal error", e.getMessage()));
+            logger.error("Internal error processing method {}: {} | trace_id={}", method, e.getMessage(), traceId, e);
+            return ResponseEntity.ok(createJsonRpcError(id, -32603, "Internal error", Map.of(
+                "trace_id", traceId,
+                "params", params,
+                "user", request.getOrDefault("user", null),
+                "exception", e.getClass().getSimpleName(),
+                "message", e.getMessage()
+            )));
+        }
+    }
+
+    // MCP-compliant response wrapper for documentation endpoints
+    public static class McpResponse<T> {
+        public String trace_id;
+        public String status;
+        public T data;
+        public String error;
+        public McpResponse(String trace_id, String status, T data, String error) {
+            this.trace_id = trace_id;
+            this.status = status;
+            this.data = data;
+            this.error = error;
+        }
+    }
+
+    @GetMapping("/mcp/tools/docs/full")
+    @Operation(
+        summary = "Enriched documentation and self-discovery for MCP tools",
+        description = "Returns the full documentation for all MCP tools, including input/output examples, long descriptions, tags, author, version, last update date, usage fields, and schema structure. Ideal for UIs, LLMs, and smart clients."
+    )
+    public ResponseEntity<McpResponse<Map<String, Object>>> toolsDocsFull() {
+        String traceId = UUID.randomUUID().toString();
+        logger.info("[tools/docs/full] Enriched documentation requested | trace_id={}", traceId);
+        try {
+            var toolsObj = dispatcherService.dispatch("tools/list", Map.of(), null).get("tools");
+            if (!(toolsObj instanceof Iterable<?> tools)) {
+                throw new IllegalStateException("tools no es iterable");
+            }
+            // Enriched structure for each tool
+            var enrichedTools = new java.util.ArrayList<>();
+            for (Object t : tools) {
+                if (t instanceof Map<?, ?>) {
+                    Map<?, ?> tool = (Map<?, ?>) t;
+                    Map<String, Object> doc = new HashMap<>();
+                    doc.put("name", tool.get("name"));
+                    doc.put("description", tool.get("description"));
+                    doc.put("input_schema", tool.get("input_schema"));
+                    Object inputSchemaObj = tool.get("input_schema");
+                    Map<?, ?> inputSchema = inputSchemaObj instanceof Map<?, ?> ? (Map<?, ?>) inputSchemaObj : null;
+                    doc.put("input_examples", inputSchema != null ? inputSchema.getOrDefault("examples", null) : null);
+                    doc.put("input_description_long", inputSchema != null ? inputSchema.getOrDefault("description_long", null) : null);
+
+                    Object metaObj = tool.get("tool_metadata");
+                    if (metaObj == null) {
+                        metaObj = tool.get("metadata");
+                    }
+                    Map<String, Object> meta = metaObj instanceof Map ? (Map<String, Object>) metaObj : null;
+
+
+                    if (meta != null) {
+                        doc.put("output_schema", meta);
+                        doc.put("output_examples", meta.getOrDefault("examples", null));
+                        doc.put("output_description_long", meta.getOrDefault("description_long", null));
+                        doc.put("tags", meta.getOrDefault("tags", null));
+                        doc.put("usage_examples", meta.getOrDefault("usage_examples", null));
+                        doc.put("author", meta.getOrDefault("author", null));
+                        doc.put("version", meta.getOrDefault("version", null));
+                        doc.put("last_updated", meta.getOrDefault("last_updated", null));
+                    }
+                    enrichedTools.add(doc);
+                }
+            }
+            Map<String, Object> docs = new HashMap<>();
+            docs.put("tools", enrichedTools);
+            docs.put("trace_id", traceId);
+            return ResponseEntity.ok(new McpResponse<>(traceId, "success", docs, null));
+        } catch (Exception e) {
+            logger.error("Error in /mcp/tools/docs/full | trace_id={}: {}", traceId, e.getMessage(), e);
+            return ResponseEntity.ok(new McpResponse<>(traceId, "error", null, e.getMessage()));
         }
     }
 
@@ -128,11 +210,12 @@ public class McpJsonRpcController {
         return e.getMessage().contains("Unknown method") || e.getMessage().contains("Unknown tool");
     }
 
-    private Map<String, Object> createJsonRpcSuccess(Object id, Object result) {
+    private Map<String, Object> createJsonRpcSuccess(Object id, Object result, String traceId) {
         Map<String, Object> response = new HashMap<>();
         response.put("jsonrpc", "2.0");
         response.put("id", id);
         response.put("result", result);
+        response.put("trace_id", traceId);
         return response;
     }
 
@@ -140,7 +223,6 @@ public class McpJsonRpcController {
         Map<String, Object> response = new HashMap<>();
         response.put("jsonrpc", "2.0");
         response.put("id", id);
-        
         Map<String, Object> error = new HashMap<>();
         error.put("code", code);
         error.put("message", message);
@@ -148,7 +230,6 @@ public class McpJsonRpcController {
             error.put("data", data);
         }
         response.put("error", error);
-        
         return response;
     }
 }

@@ -46,17 +46,42 @@ public class PrestoConfig {
     @Bean
     public DataSource dataSource() {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(url);
+        config.setJdbcUrl(sanitizeJdbcUrl(url));
         config.setUsername(user);
         if (password != null && !password.isEmpty()) {
             config.setPassword(password);
         }
-        config.setDriverClassName("io.prestosql.jdbc.PrestoDriver");
-        //config.setDriverClassName("io.trino.jdbc.TrinoDriver");
+        // Detectar entorno: AWS vs Docker local
+        boolean isAws = isAwsJdbcUrl(url);
+        if (isAws) {
+            // Trino driver para AWS
+            config.setDriverClassName("io.trino.jdbc.TrinoDriver");
+        } else {
+            // Presto driver para Docker local
+            config.setDriverClassName("io.prestosql.jdbc.PrestoDriver");
+        }
         config.setMaximumPoolSize(maxPoolSize);
         config.setConnectionTimeout(connectionTimeout);
         config.setInitializationFailTimeout(-1);
         return new HikariDataSource(config);
+    }
+
+    /**
+     * Elimina parámetros no soportados por Trino (por ejemplo, use-prepared-statements) si está en AWS.
+     */
+    private String sanitizeJdbcUrl(String url) {
+        if (isAwsJdbcUrl(url)) {
+            // Eliminar use-prepared-statements de la URL si existe
+            return url.replaceAll("([&?])use-prepared-statements=[^&]*", "");
+        }
+        return url;
+    }
+
+    /**
+     * Heurística simple para detectar si la URL es de AWS (puedes mejorarla según tu naming real)
+     */
+    private boolean isAwsJdbcUrl(String url) {
+        return url != null && url.contains("awsdatacatalog") && url.contains("trino");
     }
 
 
