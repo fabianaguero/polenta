@@ -81,83 +81,61 @@ public class ToolRegistry {
                 )
             ),
             new McpTool(
-                "list_tables",
-                "Lista todas las tablas disponibles en el data lake.",
-                Map.of(
-                    "type", "object",
-                    "properties", Map.of(),
-                    "required", List.of(),
-                    "examples", List.of(Map.of()),
-                    "description_long", "No requiere parámetros. Devuelve un listado agrupado por esquema de todas las tablas accesibles en el data lake."
-                ),
-                Map.of(
-                    "result_type", "table_list",
-                    "fields", List.of("schemas"),
-                    "examples", List.of(
-                        Map.of(
-                            "schemas", Map.of("default", List.of("clientes", "ventas"), "finanzas", List.of("pagos", "facturas"))),
-                        Map.of(
-                            "schemas", Map.of("default", List.of("productos", "proveedores")))
-                    ),
-                    "usage_examples", List.of(
-                        "¿Qué tablas hay?",
-                        "Listar todas las tablas",
-                        "Mostrar tablas disponibles",
-                        "¿Cuáles son las tablas del esquema finanzas?"
-                    ),
-                    "tags", List.of("metadata", "tablas", "listado", "exploración", "esquemas"),
-                    "version", "1.2",
-                    "author", "Equipo Data Lake",
-                    "last_updated", "2025-08-11",
-                    "description_long", "Devuelve un listado agrupado por esquema de todas las tablas accesibles en el data lake. Útil para exploración y descubrimiento de datos."
-                )
-            ),
-            new McpTool(
-                "describe_table",
-                "Devuelve la estructura de una tabla específica. Ejemplo: 'Describe la tabla clientes' o '¿Qué columnas tiene ventas?'",
+                "metadata",
+                "Explora esquemas, tablas y columnas del data lake.",
                 Map.of(
                     "type", "object",
                     "properties", Map.of(
-                        "table_name", Map.of(
+                        "schema", Map.of(
                             "type", "string",
-                            "description", "Nombre de la tabla a describir (formato: schema.table o solo table). Ejemplo: 'clientes', 'default.ventas'.",
-                            "examples", List.of("clientes", "default.ventas", "ventas", "finanzas.pagos")
+                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas'"
+                        ),
+                        "table", Map.of(
+                            "type", "string",
+                            "description", "Nombre de la tabla dentro del esquema. Ejemplo: 'clientes'"
                         )
                     ),
-                    "required", List.of("table_name"),
+                    "required", List.of(),
                     "examples", List.of(
-                        Map.of("table_name", "clientes"),
-                        Map.of("table_name", "default.ventas"),
-                        Map.of("table_name", "finanzas.pagos")
+                        Map.of(),
+                        Map.of("schema", "default"),
+                        Map.of("schema", "default", "table", "clientes")
                     ),
-                    "description_long", "El parámetro 'table_name' debe ser el nombre exacto de la tabla, con o sin esquema."
+                    "description_long", "Sin parámetros devuelve los esquemas disponibles. Con 'schema' lista las tablas del esquema. Con 'schema' y 'table' describe las columnas de la tabla."
                 ),
                 Map.of(
-                    "result_type", "table_description",
-                    "fields", List.of("schema", "table", "columns"),
+                    "result_type", "metadata",
+                    "fields", List.of("schemas", "schema", "tables", "table", "columns", "message"),
                     "examples", List.of(
+                        Map.of(
+                            "schemas", List.of("default", "finanzas"),
+                            "message", "Lista de esquemas disponibles"
+                        ),
+                        Map.of(
+                            "schema", "default",
+                            "tables", List.of("clientes", "ventas"),
+                            "message", "Lista de tablas del esquema default"
+                        ),
                         Map.of(
                             "schema", "default",
                             "table", "clientes",
-                            "columns", List.of(Map.of("name", "cliente_id", "type", "int"), Map.of("name", "nombre", "type", "string"))
-                        ),
-                        Map.of(
-                            "schema", "finanzas",
-                            "table", "pagos",
-                            "columns", List.of(Map.of("name", "pago_id", "type", "int"), Map.of("name", "monto", "type", "decimal"), Map.of("name", "fecha", "type", "date"))
+                            "columns", List.of(
+                                Map.of("Column", "cliente_id", "Type", "bigint"),
+                                Map.of("Column", "nombre", "Type", "varchar")
+                            ),
+                            "message", "Estructura de la tabla default.clientes"
                         )
                     ),
                     "usage_examples", List.of(
-                        "Describe la tabla clientes",
-                        "¿Qué columnas tiene ventas?",
-                        "Estructura de default.ventas",
-                        "¿Cómo es la tabla finanzas.pagos?"
+                        "Listar esquemas disponibles",
+                        "Mostrar tablas del esquema default",
+                        "Describir la tabla clientes en default"
                     ),
-                    "tags", List.of("metadata", "tablas", "estructura", "describe", "columnas"),
-                    "version", "1.2",
+                    "tags", List.of("metadata", "esquemas", "tablas", "columnas"),
+                    "version", "1.0",
                     "author", "Equipo Data Lake",
                     "last_updated", "2025-08-11",
-                    "description_long", "Devuelve el esquema de columnas y tipos de una tabla específica, útil para exploración y validación de datos. Incluye nombre, tipo y orden de las columnas."
+                    "description_long", "Permite navegar el catálogo de datos en un único punto."
                 )
             ),
             new McpTool(
@@ -293,107 +271,6 @@ public class ToolRegistry {
                     "description_long", "Devuelve una lista de sugerencias de consultas útiles para usuarios nuevos o que buscan inspiración. Incluye ejemplos de preguntas y sentencias SQL."
                 )
             ),
-            new McpTool(
-                "schemas",
-                "Devuelve la lista de esquemas disponibles en el data lake.",
-                Map.of(
-                    "type", "object",
-                    "properties", Map.of(),
-                    "required", List.of(),
-                    "examples", List.of(Map.of()),
-                    "description_long", "No requiere parámetros. Devuelve un listado de todos los esquemas disponibles."
-                ),
-                Map.of(
-                    "result_type", "schemas_list",
-                    "fields", List.of("schemas"),
-                    "examples", List.of(
-                        Map.of("schemas", List.of("default", "finanzas", "ventas")),
-                        Map.of("schemas", List.of("tiny", "tpch"))
-                    ),
-                    "usage_examples", List.of(
-                        "Listar esquemas",
-                        "¿Qué esquemas hay?",
-                        "Mostrar todos los esquemas"
-                    ),
-                    "tags", List.of("metadata", "esquemas", "exploración"),
-                    "version", "1.0",
-                    "author", "Equipo Data Lake",
-                    "last_updated", "2025-08-11",
-                    "description_long", "Devuelve un listado de todos los esquemas disponibles en el data lake."
-                )
-            ),
-            new McpTool(
-                "tables",
-                "Devuelve la lista de tablas de un esquema específico.",
-                Map.of(
-                    "type", "object",
-                    "properties", Map.of(
-                        "schema", Map.of(
-                            "type", "string",
-                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas', 'tiny'"
-                        )
-                    ),
-                    "required", List.of("schema"),
-                    "examples", List.of(Map.of("schema", "default")),
-                    "description_long", "El parámetro 'schema' es obligatorio. Devuelve todas las tablas del esquema indicado."
-                ),
-                Map.of(
-                    "result_type", "tables_list",
-                    "fields", List.of("schema", "tables"),
-                    "examples", List.of(
-                        Map.of("schema", "default", "tables", List.of("clientes", "ventas")),
-                        Map.of("schema", "tiny", "tables", List.of("nation", "region"))
-                    ),
-                    "usage_examples", List.of(
-                        "Listar tablas del esquema default",
-                        "¿Qué tablas hay en finanzas?",
-                        "Mostrar tablas de tiny"
-                    ),
-                    "tags", List.of("metadata", "tablas", "exploración", "esquemas"),
-                    "version", "1.0",
-                    "author", "Equipo Data Lake",
-                    "last_updated", "2025-08-11",
-                    "description_long", "Devuelve todas las tablas del esquema indicado."
-                )
-            ),
-            new McpTool(
-                "columns",
-                "Devuelve la lista de columnas de una tabla específica.",
-                Map.of(
-                    "type", "object",
-                    "properties", Map.of(
-                        "schema", Map.of(
-                            "type", "string",
-                            "description", "Nombre del esquema. Ejemplo: 'default', 'finanzas', 'tiny'"
-                        ),
-                        "table", Map.of(
-                            "type", "string",
-                            "description", "Nombre de la tabla. Ejemplo: 'clientes', 'nation'"
-                        )
-                    ),
-                    "required", List.of("schema", "table"),
-                    "examples", List.of(Map.of("schema", "default", "table", "clientes")),
-                    "description_long", "Los parámetros 'schema' y 'table' son obligatorios. Devuelve todas las columnas de la tabla indicada."
-                ),
-                Map.of(
-                    "result_type", "columns_list",
-                    "fields", List.of("schema", "table", "columns"),
-                    "examples", List.of(
-                        Map.of("schema", "default", "table", "clientes", "columns", List.of("cliente_id", "nombre", "fecha_alta")),
-                        Map.of("schema", "tiny", "table", "nation", "columns", List.of("nationkey", "name", "regionkey"))
-                    ),
-                    "usage_examples", List.of(
-                        "Listar columnas de clientes en default",
-                        "¿Qué columnas tiene la tabla nation en tiny?",
-                        "Mostrar columnas de ventas en finanzas"
-                    ),
-                    "tags", List.of("metadata", "columnas", "exploración", "tablas"),
-                    "version", "1.0",
-                    "author", "Equipo Data Lake",
-                    "last_updated", "2025-08-11",
-                    "description_long", "Devuelve todas las columnas de la tabla indicada."
-                )
-            )
         );
     }
 }
