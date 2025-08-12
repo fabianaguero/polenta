@@ -182,22 +182,16 @@ Ejecuta consultas en lenguaje natural o SQL directo.
 - "Dame datos de ejemplo de la tabla ventas"
 - "SELECT * FROM productos LIMIT 10"
 
-### 2. `list_tables`
-Lista todas las tablas disponibles organizadas por esquema.
+### 2. `metadata`
+Navega los metadatos del catálogo. Sin parámetros devuelve los esquemas disponibles. Con `schema` lista las tablas del esquema. Con `schema` y `table` describe las columnas de la tabla.
 
-### 3. `accessible_tables`
-Lista únicamente las tablas a las que el usuario tiene permiso de consulta.
-
-### 4. `describe_table`
-Obtiene información detallada sobre la estructura de una tabla específica.
-
-### 5. `sample_data`
+### 3. `sample_data`
 Obtiene datos de muestra de una tabla (limitado a 10 filas).
 
-### 6. `search_tables`
+### 4. `search_tables`
 Busca tablas que contengan palabras clave específicas.
 
-### 7. `get_suggestions`
+### 5. `get_suggestions`
 Proporciona sugerencias útiles de consultas para usuarios.
 
 ## Ejemplos de Consultas en Lenguaje Natural
