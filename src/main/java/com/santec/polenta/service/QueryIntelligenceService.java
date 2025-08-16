@@ -70,26 +70,33 @@ public class QueryIntelligenceService {
         }
     }
 
-    private Map<String, Object> handleShowTables(String query) throws SQLException {
+    public Map<String, Object> handleShowTables(String query) {
         logger.info("Entering handleShowTables with query: {}", query);
         Map<String, Object> response = new HashMap<>();
-        List<String> schemas = prestoService.getSchemas();
-        logger.debug("Schemas obtained: {}", schemas);
-        Map<String, List<String>> schemaTablesMap = new HashMap<>();
-        for (String schema : schemas) {
-            try {
-                List<String> tables = prestoService.getTables(schema);
-                logger.debug("Tables in schema {}: {}", schema, tables);
-                if (!tables.isEmpty()) {
-                    schemaTablesMap.put(schema, tables);
+        try {
+            List<String> schemas = prestoService.getSchemas();
+            logger.debug("Schemas obtained: {}", schemas);
+            Map<String, List<String>> schemaTablesMap = new HashMap<>();
+            for (String schema : schemas) {
+                try {
+                    List<String> tables = prestoService.getTables(schema);
+                    logger.debug("Tables in schema {}: {}", schema, tables);
+                    if (!tables.isEmpty()) {
+                        schemaTablesMap.put(schema, tables);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not access schema {}: {}", schema, e.getMessage());
                 }
-            } catch (SQLException e) {
-                logger.warn("Could not access schema {}: {}", schema, e.getMessage());
             }
+            response.put("type", "table_list");
+            response.put("schemas", schemaTablesMap);
+            response.put("message", "Available tables organized by schema");
+        } catch (Exception e) {
+            logger.error("Error in handleShowTables: {}", e.getMessage(), e);
+            response.put("type", "error");
+            response.put("message", "Error getting tables: " + e.getMessage());
+            response.put("schemas", new HashMap<>());
         }
-        response.put("type", "table_list");
-        response.put("schemas", schemaTablesMap);
-        response.put("message", "Available tables organized by schema");
         return response;
     }
 
@@ -438,5 +445,14 @@ public class QueryIntelligenceService {
         response.put("columns", columns);
         response.put("message", String.format("Structure of table %s.%s", schema, table));
         return new McpResponse<>(traceId, "success", response, null);
+    }
+
+    public List<String> getSchemas() {
+        try {
+            return prestoService.getSchemas();
+        } catch (java.sql.SQLException e) {
+            logger.error("Error getting schemas from PrestoService: {}", e.getMessage(), e);
+            return java.util.Collections.emptyList();
+        }
     }
 }

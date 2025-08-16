@@ -171,6 +171,18 @@ public class McpController {
         }
     }
 
+    // New endpoint for schemas
+    @GetMapping("/schemas")
+    @Operation(
+        summary = "[HELPER] Lista los esquemas disponibles",
+        description = "Devuelve un objeto JSON con la lista de esquemas en la clave 'content'."
+    )
+    public ResponseEntity<Map<String, Object>> getSchemas() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", dispatcherService.dispatch("tools/call", Map.of("name", "schemas", "arguments", Map.of()), null).get("content"));
+        return ResponseEntity.ok(response);
+    }
+
     // --- Utility methods for helper endpoints ---
 
     private String generateSessionId(HttpServletRequest request) {

@@ -193,25 +193,50 @@ public class McpDispatcherService {
                     suggestions.put("message", "Helpful query suggestions");
                     result = suggestions;
                     break;
+                case "schemas":
+                    List<String> schemasList = queryIntelligenceService.getSchemas();
+                    result = new HashMap<>();
+                    result.put("content", schemasList);
+                    logger.info("Tool '{}' response: {}", toolName, result);
+                    return result;
+                case "list_tables":
+                    // Get tables by schema using the existing method
+                    Map<String, Object> showTablesResult = queryIntelligenceService.handleShowTables("show tables");
+                    Object schemasMapObj = showTablesResult.get("schemas");
+                    List<Map<String, Object>> contentList = new java.util.ArrayList<>();
+                    if (schemasMapObj instanceof Map<?, ?> schemasMap) {
+                        for (var entry : schemasMap.entrySet()) {
+                            String schemaName = entry.getKey().toString();
+                            Object tablesObj = entry.getValue();
+                            List<String> tables;
+                            if (tablesObj instanceof List<?>) {
+                                // Forzar que todos los elementos sean String
+                                List<?> rawList = (List<?>) tablesObj;
+                                tables = new java.util.ArrayList<>();
+                                for (Object o : rawList) {
+                                    if (o != null) tables.add(o.toString());
+                                }
+                            } else {
+                                tables = java.util.Collections.emptyList();
+                            }
+                            Map<String, Object> schemaTables = new java.util.HashMap<>();
+                            schemaTables.put("schema", schemaName);
+                            schemaTables.put("tables", tables);
+                            contentList.add(schemaTables);
+                        }
+                    }
+                    result = new HashMap<>();
+                    result.put("content", contentList);
+                    logger.info("Tool '{}' response: {}", toolName, result);
+                    return result;
                 default:
                     throw new IllegalArgumentException("Unknown tool: " + toolName);
             }
-            result.putIfAbsent("status", "success");
-            result.putIfAbsent("execution_id", UUID.randomUUID().toString());
-            result.putIfAbsent("timestamp", System.currentTimeMillis());
-            if (!result.containsKey("user_message") && result.containsKey("message")) {
-                result.put("user_message", result.get("message"));
-            }
-            // next_suggestions puede ser generado aquí si lo deseas
         } catch (Exception e) {
-            result = new HashMap<>();
-            result.put("status", "error");
-            result.put("error_message", e.getMessage());
-            result.put("execution_id", UUID.randomUUID().toString());
-            result.put("timestamp", System.currentTimeMillis());
-            result.put("user_message", "An error occurred while executing the tool.");
+            logger.error("Error executing tool '{}': {}", toolName, e.getMessage(), e);
+            throw new RuntimeException("Error executing tool: " + e.getMessage(), e);
         }
-        return result;
+        throw new IllegalStateException("Unexpected error in executeToolCall");
     }
 
     private Map<String, Object> getServerCapabilities() {

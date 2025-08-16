@@ -1,8 +1,47 @@
+server:
+  port: 8090
+
 spring:
-  profiles:
-    active: aws
   application:
     name: polenta-mcp-server
 
-server:
-  port: 8090
+# PrestoDB Configuration
+presto:
+    url: ${PRESTO_URL:jdbc:presto://localhost:8080/tpch/sf1}
+    user: ${PRESTO_USER:admin}
+    password: ${PRESTO_PASSWORD:}
+
+    catalog: ${PRESTO_CATALOG:tpch}
+    schema: ${PRESTO_SCHEMA:sf1}
+    query-timeout: 30000 # Tiempo máximo para ejecutar consultas (ms)
+
+
+
+# MCP Server Configuration
+mcp:
+  server:
+    name: "Polenta Data Lake Server"
+    version: "1.0.0"
+    description: "MCP Server for accessing PrestoDB data lake with user-friendly queries"
+  helpers:
+    enabled: true  # Set to false in production to disable REST wrapper endpoints
+
+# Logging Configuration
+logging:
+  level:
+    com.santec.polenta: DEBUG
+    io.prestodb: INFO
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

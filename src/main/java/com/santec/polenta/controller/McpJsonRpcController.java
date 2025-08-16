@@ -92,27 +92,30 @@ public class McpJsonRpcController {
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid request for method {}: {} | trace_id={}", method, e.getMessage(), traceId);
             int errorCode = isMethodNotFound(method, e) ? -32601 : -32602;
-            return ResponseEntity.ok(createJsonRpcError(id, errorCode, e.getMessage(), Map.of(
-                "trace_id", traceId,
-                "params", params,
-                "user", request.getOrDefault("user", null)
-            )));
+            Map<String, Object> data = new HashMap<>();
+            data.put("trace_id", traceId);
+            if (params != null) data.put("params", params);
+            Object user = request.getOrDefault("user", null);
+            if (user != null) data.put("user", user);
+            return ResponseEntity.ok(createJsonRpcError(id, errorCode, e.getMessage(), data.isEmpty() ? null : data));
         } catch (IllegalStateException e) {
             logger.warn("State error for method {}: {} | trace_id={}", method, e.getMessage(), traceId);
-            return ResponseEntity.ok(createJsonRpcError(id, -32000, e.getMessage(), Map.of(
-                "trace_id", traceId,
-                "params", params,
-                "user", request.getOrDefault("user", null)
-            )));
+            Map<String, Object> data = new HashMap<>();
+            data.put("trace_id", traceId);
+            if (params != null) data.put("params", params);
+            Object user = request.getOrDefault("user", null);
+            if (user != null) data.put("user", user);
+            return ResponseEntity.ok(createJsonRpcError(id, -32000, e.getMessage(), data.isEmpty() ? null : data));
         } catch (Exception e) {
             logger.error("Internal error processing method {}: {} | trace_id={}", method, e.getMessage(), traceId, e);
-            return ResponseEntity.ok(createJsonRpcError(id, -32603, "Internal error", Map.of(
-                "trace_id", traceId,
-                "params", params,
-                "user", request.getOrDefault("user", null),
-                "exception", e.getClass().getSimpleName(),
-                "message", e.getMessage()
-            )));
+            Map<String, Object> data = new HashMap<>();
+            data.put("trace_id", traceId);
+            if (params != null) data.put("params", params);
+            Object user = request.getOrDefault("user", null);
+            if (user != null) data.put("user", user);
+            data.put("exception", e.getClass().getSimpleName());
+            if (e.getMessage() != null) data.put("message", e.getMessage());
+            return ResponseEntity.ok(createJsonRpcError(id, -32603, "Internal error", data.isEmpty() ? null : data));
         }
     }
 
