@@ -187,46 +187,106 @@ public class McpDispatcherService {
                     result = queryIntelligenceService.processNaturalQuery("search for " + keyword);
                     break;
                 case "get_suggestions":
-                    Map<String, Object> suggestions = new HashMap<>();
-                    suggestions.put("type", "suggestions");
-                    suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
-                    suggestions.put("message", "Helpful query suggestions");
-                    result = suggestions;
+                    List<String> suggestionsList = queryIntelligenceService.getQuerySuggestions();
+                    
+                    // Build human-readable text format for MCP clients
+                    StringBuilder suggestionsText = new StringBuilder();
+                    suggestionsText.append("Helpful query suggestions:\n\n");
+                    
+                    if (suggestionsList.isEmpty()) {
+                        suggestionsText.append("No suggestions available at the moment.");
+                    } else {
+                        for (String suggestion : suggestionsList) {
+                            suggestionsText.append("• ").append(suggestion).append("\n");
+                        }
+                    }
+                    
+                    // Create MCP-compliant response
+                    result = new HashMap<>();
+                    List<Map<String, Object>> suggestionsContentList = new java.util.ArrayList<>();
+                    Map<String, Object> suggestionsTextContent = new HashMap<>();
+                    suggestionsTextContent.put("type", "text");
+                    suggestionsTextContent.put("text", suggestionsText.toString().trim());
+                    suggestionsContentList.add(suggestionsTextContent);
+                    result.put("content", suggestionsContentList);
                     break;
                 case "schemas":
                     List<String> schemasList = queryIntelligenceService.getSchemas();
+                    
+                    // Build human-readable text format for MCP clients
+                    StringBuilder schemasText = new StringBuilder();
+                    schemasText.append("Available schemas in the data lake:\n\n");
+                    
+                    if (schemasList.isEmpty()) {
+                        schemasText.append("No schemas found. Please check your database connection.");
+                    } else {
+                        for (String schemaName : schemasList) {
+                            schemasText.append("- ").append(schemaName).append("\n");
+                        }
+                    }
+                    
+                    // Create MCP-compliant response
                     result = new HashMap<>();
-                    result.put("content", schemasList);
+                    List<Map<String, Object>> schemasContentList = new java.util.ArrayList<>();
+                    Map<String, Object> schemasTextContent = new HashMap<>();
+                    schemasTextContent.put("type", "text");
+                    schemasTextContent.put("text", schemasText.toString().trim());
+                    schemasContentList.add(schemasTextContent);
+                    result.put("content", schemasContentList);
+                    
                     logger.info("Tool '{}' response: {}", toolName, result);
                     return result;
                 case "list_tables":
                     // Get tables by schema using the existing method
                     Map<String, Object> showTablesResult = queryIntelligenceService.handleShowTables("show tables");
                     Object schemasMapObj = showTablesResult.get("schemas");
-                    List<Map<String, Object>> contentList = new java.util.ArrayList<>();
+                    
+                    // Build human-readable text format for MCP clients
+                    StringBuilder textBuilder = new StringBuilder();
+                    textBuilder.append("Available tables organized by schema:\n\n");
+                    
                     if (schemasMapObj instanceof Map<?, ?> schemasMap) {
-                        for (var entry : schemasMap.entrySet()) {
-                            String schemaName = entry.getKey().toString();
-                            Object tablesObj = entry.getValue();
-                            List<String> tables;
-                            if (tablesObj instanceof List<?>) {
-                                // Forzar que todos los elementos sean String
-                                List<?> rawList = (List<?>) tablesObj;
-                                tables = new java.util.ArrayList<>();
-                                for (Object o : rawList) {
-                                    if (o != null) tables.add(o.toString());
+                        if (schemasMap.isEmpty()) {
+                            textBuilder.append("No tables found. Please check your database connection.");
+                        } else {
+                            for (var entry : schemasMap.entrySet()) {
+                                String schemaName = entry.getKey().toString();
+                                Object tablesObj = entry.getValue();
+                                List<String> tablesList;
+                                if (tablesObj instanceof List<?>) {
+                                    List<?> rawList = (List<?>) tablesObj;
+                                    tablesList = new java.util.ArrayList<>();
+                                    for (Object o : rawList) {
+                                        if (o != null) tablesList.add(o.toString());
+                                    }
+                                } else {
+                                    tablesList = java.util.Collections.emptyList();
                                 }
-                            } else {
-                                tables = java.util.Collections.emptyList();
+                                
+                                textBuilder.append("**").append(schemaName).append("**:\n");
+                                if (tablesList.isEmpty()) {
+                                    textBuilder.append("  (No tables found)\n");
+                                } else {
+                                    for (String tableName : tablesList) {
+                                        textBuilder.append("  - ").append(tableName).append("\n");
+                                    }
+                                }
+                                textBuilder.append("\n");
                             }
-                            Map<String, Object> schemaTables = new java.util.HashMap<>();
-                            schemaTables.put("schema", schemaName);
-                            schemaTables.put("tables", tables);
-                            contentList.add(schemaTables);
                         }
+                    } else {
+                        textBuilder.append("No schemas found. Please check your database connection.");
                     }
+                    
+                    // Create MCP-compliant response
                     result = new HashMap<>();
-                    result.put("content", contentList);
+                    List<Map<String, Object>> tablesContentList = new java.util.ArrayList<>();
+                    Map<String, Object> tablesTextContent = new HashMap<>();
+                    tablesTextContent.put("type", "text");
+                    tablesTextContent.put("text", textBuilder.toString().trim());
+                    tablesContentList.add(tablesTextContent);
+                    result.put("content", tablesContentList);
+                    
                     logger.info("Tool '{}' response: {}", toolName, result);
                     return result;
                 default:
@@ -236,7 +296,9 @@ public class McpDispatcherService {
             logger.error("Error executing tool '{}': {}", toolName, e.getMessage(), e);
             throw new RuntimeException("Error executing tool: " + e.getMessage(), e);
         }
-        throw new IllegalStateException("Unexpected error in executeToolCall");
+        
+        logger.info("Tool '{}' response: {}", toolName, result);
+        return result;
     }
 
     private Map<String, Object> getServerCapabilities() {
