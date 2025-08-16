@@ -187,11 +187,28 @@ public class McpDispatcherService {
                     result = queryIntelligenceService.processNaturalQuery("search for " + keyword);
                     break;
                 case "get_suggestions":
-                    Map<String, Object> suggestions = new HashMap<>();
-                    suggestions.put("type", "suggestions");
-                    suggestions.put("suggestions", queryIntelligenceService.getQuerySuggestions());
-                    suggestions.put("message", "Helpful query suggestions");
-                    result = suggestions;
+                    List<String> suggestionsList = queryIntelligenceService.getQuerySuggestions();
+                    
+                    // Build human-readable text format for MCP clients
+                    StringBuilder suggestionsText = new StringBuilder();
+                    suggestionsText.append("Helpful query suggestions:\n\n");
+                    
+                    if (suggestionsList.isEmpty()) {
+                        suggestionsText.append("No suggestions available at the moment.");
+                    } else {
+                        for (String suggestion : suggestionsList) {
+                            suggestionsText.append("• ").append(suggestion).append("\n");
+                        }
+                    }
+                    
+                    // Create MCP-compliant response
+                    result = new HashMap<>();
+                    List<Map<String, Object>> suggestionsContentList = new java.util.ArrayList<>();
+                    Map<String, Object> suggestionsTextContent = new HashMap<>();
+                    suggestionsTextContent.put("type", "text");
+                    suggestionsTextContent.put("text", suggestionsText.toString().trim());
+                    suggestionsContentList.add(suggestionsTextContent);
+                    result.put("content", suggestionsContentList);
                     break;
                 case "schemas":
                     List<String> schemasList = queryIntelligenceService.getSchemas();
@@ -279,7 +296,9 @@ public class McpDispatcherService {
             logger.error("Error executing tool '{}': {}", toolName, e.getMessage(), e);
             throw new RuntimeException("Error executing tool: " + e.getMessage(), e);
         }
-        throw new IllegalStateException("Unexpected error in executeToolCall");
+        
+        logger.info("Tool '{}' response: {}", toolName, result);
+        return result;
     }
 
     private Map<String, Object> getServerCapabilities() {
